@@ -104,7 +104,7 @@ export async function acceptMilestone(userId: string, milestoneId: string, opts:
     const hold = await prisma.escrowHold.findFirst({ where: { milestone_id: milestoneId, status: "held" } });
     await logActivity({ actor_id: userId, entity_type: "escrow_hold", entity_id: hold?.id ?? milestoneId, action: "release_blocked", meta: { dispute_id: blocking.id, via: "acceptMilestone" } });
   }
-  if (blocking) throw new AppError("escrow_blocked", `Раскрытие заблокировано: открыт спор ${blocking.id} (${blocking.status})`, 409, { dispute_id: blocking.id });
+  if (blocking) throw new AppError("escrow_blocked", `Принять этап нельзя: по нему открыт спор. Дождитесь решения администратора.`, 409, { dispute_id: blocking.id });
   if (!opts.skip_checklist) {
     const gate = await checklistGate(milestoneId);
     if (gate.missing.length) throw new AppError("checklist_photo_required", `Критичные пункты без фото: ${gate.missing.join("; ")}`, 400, gate.missing);
@@ -144,7 +144,7 @@ async function releaseEscrowTx(milestoneId: string, actorId: string, opts: { rel
     if (!hold) throw conflict("no_hold", "Нет удержанных средств по этапу");
     const dispute = await activeDisputeFor(milestoneId, tx);
     if (dispute && dispute.id !== opts.force_by_dispute) {
-      throw new AppError("escrow_blocked", `Раскрытие заблокировано: открыт спор ${dispute.id} (${dispute.status}). Дождитесь resolved/rejected.`, 409, { dispute_id: dispute.id, hold_id: hold.id });
+      throw new AppError("escrow_blocked", `Деньги из эскроу нельзя перевести: по этому этапу открыт спор (${dispute.status === "open" ? "ожидает рассмотрения" : "на рассмотрении"}). Дождитесь решения администратора.`, 409, { dispute_id: dispute.id, hold_id: hold.id });
     }
     const deal = await tx.deal.findUniqueOrThrow({ where: { id: hold.deal_id }, include: { seller: true } });
     const total = new Prisma.Decimal(hold.amount);

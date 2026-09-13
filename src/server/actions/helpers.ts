@@ -11,7 +11,9 @@ export async function act(returnTo: string, fn: () => Promise<string | void>) {
     dest = `${base}${base.includes("?") ? "&" : "?"}ok=${encodeURIComponent(r && !r.startsWith("/") ? r : "Готово")}`;
   } catch (e) {
     if (isRedirect(e)) throw e;
-    const msg = e instanceof AppError ? e.message : e instanceof Error ? e.message : String(e);
+    let msg = e instanceof AppError ? e.message : e instanceof Error ? e.message : String(e);
+    if (/No record was found|Invalid `prisma\./.test(msg)) msg = "Не удалось найти нужную запись — возможно, страница устарела. Обновите её и попробуйте снова.";
+    else if (/prisma|Prisma|ECONN|timeout/i.test(msg)) msg = "Временная ошибка сервера. Попробуйте ещё раз через минуту.";
     dest = `${returnTo}${returnTo.includes("?") ? "&" : "?"}error=${encodeURIComponent(msg.slice(0, 300))}`;
   }
   revalidatePath("/", "layout");

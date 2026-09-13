@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { hasValidLicense } from "@/server/services/matching";
 import { Field, Flash, Money } from "@/components/ui";
 import { offerAction } from "@/server/actions/supplier";
+import { L } from "@/lib/i18n";
 
 export default async function NewOffer({ searchParams }: { searchParams: Promise<{ request?: string; template?: string; error?: string; ok?: string }> }) {
   const s = await requireSession(); const sp = await searchParams; const c = companyOf(s);
@@ -17,8 +18,8 @@ export default async function NewOffer({ searchParams }: { searchParams: Promise
   const values = req.values_json as Record<string, unknown>;
   const prev = req.offers[0];
   const ref = await prisma.priceReference.findFirst({ where: { category_id: req.category_id } });
-  return <div className="mx-auto max-w-4xl"><h1 className="h1 mb-1">КП: {req.category.name}{prev ? ` (версия ${prev.version + 1})` : ""}</h1><p className="muted mb-3">{req.project.city} · {req.project.object_type} · <Link className="text-brand-600" href={`/requests/${req.id}`}>заявка</Link>{ref ? <> · ориентир рынка: <Money v={ref.price_min} />–<Money v={ref.price_max} /> за {ref.unit}</> : null}</p><Flash sp={sp} />
-    {!lead || lead.status !== "purchased" ? <p className="rounded bg-amber-50 p-3 text-sm text-amber-800">Сначала получите лид по этой заявке.</p> : !licensed ? <p className="rounded bg-red-50 p-3 text-sm text-red-800">Категория «{req.category.name}» требует верифицированную лицензию. Кнопка отправки недоступна — и бэкенд отклонит запрос независимо от UI. Загрузите лицензию в <Link className="underline" href="/supplier/settings">настройках</Link>.</p> : null}
+  return <div className="mx-auto max-w-4xl"><h1 className="h1 mb-1">КП: {req.category.name}{prev ? ` (версия ${prev.version + 1})` : ""}</h1><p className="muted mb-3">{req.project.city} · {L(req.project.object_type)} · <Link className="text-brand-600" href={`/requests/${req.id}`}>заявка</Link>{ref ? <> · ориентир рынка: <Money v={ref.price_min} />–<Money v={ref.price_max} /> за {ref.unit}</> : null}</p><Flash sp={sp} />
+    {!lead || lead.status !== "purchased" ? <p className="rounded bg-amber-50 p-3 text-sm text-amber-800">Чтобы ответить на эту заявку, сначала купите лид на странице <Link className="underline" href="/supplier/leads">«Лиды»</Link>.</p> : !licensed ? <p className="rounded bg-red-50 p-3 text-sm text-red-800">Категория «{req.category.name}» требует верифицированную лицензию. Кнопка отправки недоступна — и бэкенд отклонит запрос независимо от UI. Загрузите лицензию в <Link className="underline" href="/supplier/settings">настройках</Link>.</p> : null}
     <div className="grid gap-4 lg:grid-cols-3"><form action={offerAction} className="card space-y-3 lg:col-span-2"><input type="hidden" name="request_id" value={req.id} />{tpl && <input type="hidden" name="template_id" value={tpl.id} />}
       {templates.length > 0 && <div className="flex flex-wrap items-center gap-2 text-sm">Шаблоны КП: {templates.map((t) => <a key={t.id} href={`/supplier/offers/new?request=${req.id}&template=${t.id}`} className={`badge ${t.id === tpl?.id ? "bg-brand-600 text-white" : "bg-slate-100"}`}>{t.name}</a>)}</div>}
       <Field label="Объём КП (частичное КП)"><select className="input" name="offer_scope" defaultValue={tv.offer_scope ?? "material_and_work"}><option value="material_and_work">материал и работа</option><option value="material_only">только материал</option><option value="install_only">только монтаж/работа</option></select></Field>

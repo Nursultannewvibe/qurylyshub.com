@@ -5,6 +5,7 @@ import { prisma } from "@/server/db";
 import { Field, Flash } from "@/components/ui";
 import { createRequestAction, aiParseAction } from "@/server/actions/buyer";
 import { Calculators } from "./calculators";
+import { config } from "@/server/config";
 
 export default async function NewRequest({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ category?: string; target?: string; ai?: string; error?: string; ok?: string }> }) {
   const { id } = await params; const sp = await searchParams; const s = await requireSession();
@@ -27,7 +28,7 @@ export default async function NewRequest({ params, searchParams }: { params: Pro
     {seasonal && <p className="mb-3 rounded bg-amber-50 p-2 text-sm text-amber-800">⚠ {seasonal}</p>}
     <details className="card mb-4" open={!!sp.ai}><summary className="cursor-pointer font-semibold">🤖 AI-разбор: опишите задачу текстом / расшифровкой голосового / описанием плана</summary>
       <form action={aiParseAction} className="mt-2 space-y-2"><input type="hidden" name="project_id" value={id} /><input type="hidden" name="category_id" value={category.id} />{target && <input type="hidden" name="target_company_id" value={target.id} />}
-        <textarea className="input" name="text" rows={3} placeholder="Например: нужен ленточный фундамент 12×8, высота 1.2, ширина 0.5, бетон М300, с насосом" required /><div className="flex items-center gap-2"><select className="input w-40" name="input_kind"><option value="text">текст</option><option value="voice">голос (расшифровка)</option><option value="plan">план</option><option value="photo">фото (описание)</option></select><button className="btn-secondary">Разобрать</button><span className="text-xs text-slate-400">Адрес, ФИО и телефон в LLM не передаются; лимит {process.env.AI_PARSE_DAILY_LIMIT ?? 10}/день.</span></div></form>
+        <textarea className="input" name="text" rows={3} placeholder="Например: нужен ленточный фундамент 12×8, высота 1.2, ширина 0.5, бетон М300, с насосом" required /><div className="flex items-center gap-2"><select className="input w-40" name="input_kind"><option value="text">текст</option><option value="voice">голос (расшифровка)</option><option value="plan">план</option><option value="photo">фото (описание)</option></select><button className="btn-secondary">Разобрать</button><span className="text-xs text-slate-400">Адрес, ФИО и телефон в LLM не передаются; лимит {config.aiParseDailyLimit} разборов в день.</span></div></form>
       {ai && <p className="mt-2 text-xs text-slate-500">Предзаполнено из разбора ({ai.provider}); проверьте и подтвердите. Уверенность: {String((ai.result_json as { confidence?: number })?.confidence ?? "—")}</p>}</details>
     <Calculators category={category.code} />
     <form action={createRequestAction} className="card grid gap-3 sm:grid-cols-2"><input type="hidden" name="project_id" value={id} /><input type="hidden" name="category_id" value={category.id} />{target && <><input type="hidden" name="target_company_id" value={target.id} /><input type="hidden" name="mode" value="direct" /></>}{ai && <input type="hidden" name="ai_parse_id" value={ai.id} />}

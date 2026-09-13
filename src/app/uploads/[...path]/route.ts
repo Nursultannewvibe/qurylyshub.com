@@ -7,6 +7,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ path: string[]
   const { path: parts } = await ctx.params;
   if (parts.some((p) => p.includes(".."))) return new Response("bad path", { status: 400 });
   if (!(await getSession())) return new Response("unauthorized", { status: 401 });
+  // старые ссылки /uploads/acts/<id>.html → документ из БД
+  if (parts[0] === "acts" && parts[1]) return Response.redirect(new URL(`/acts/${parts[1].replace(/\.html$/, "")}`, _req.url), 302);
   try {
     const buf = await readFile(path.join(config.uploadDir, ...parts));
     const ext = path.extname(parts[parts.length - 1]).toLowerCase();

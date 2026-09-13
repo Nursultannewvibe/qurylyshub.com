@@ -10,6 +10,7 @@ import * as AI from "../services/ai";
 import * as C from "../services/chat";
 import { prisma } from "../db";
 import type { DealItemPortion } from "@prisma/client";
+import { saveUpload, fileFrom } from "../services/uploads";
 
 export async function createProjectAction(fd: FormData) {
   const s = await requireSession();
@@ -43,7 +44,7 @@ export async function stageProgressAction(fd: FormData) {
 
 export async function addLabReportAction(fd: FormData) {
   const s = await requireSession(); const pid = str(fd, "project_id");
-  await act(`/projects/${pid}`, async () => { await T.addLabReport(s.user.id, { project_id: pid, lab_name: str(fd, "lab_name"), report_type: str(fd, "report_type") as never, verdict_summary: str(fd, "verdict_summary") || undefined, file_url: str(fd, "file_url") || undefined }); return "Лабораторный отчёт добавлен"; });
+  await act(`/projects/${pid}`, async () => { const f = fileFrom(fd, "file"); const url = f ? await saveUpload(f, "lab") : str(fd, "file_url") || undefined; await T.addLabReport(s.user.id, { project_id: pid, lab_name: str(fd, "lab_name"), report_type: str(fd, "report_type") as never, verdict_summary: str(fd, "verdict_summary") || undefined, file_url: url }); return "Лабораторный отчёт добавлен"; });
 }
 
 export async function createRequestAction(fd: FormData) {
@@ -60,8 +61,9 @@ export async function createRequestAction(fd: FormData) {
     }
     const ai = str(fd, "ai_parse_id") ? await prisma.aiParse.findUnique({ where: { id: str(fd, "ai_parse_id") } }) : null;
     const r = await Rq.createRequest(s.user.id, { project_id: pid, category_id: cat, stage_id: str(fd, "stage_id") || null, values, mode: (str(fd, "mode") || "matched") as never, target_company_id: str(fd, "target_company_id") || null, ai_extracted: ai?.result_json ?? undefined });
-    const info = r.match ? `лидов создано: ${r.match.leads.length}` : "";
-    return `/requests/${r.request.id}?ok=${encodeURIComponent(`Заявка опубликована. ${info}${r.warnings.length ? " Предупреждения: " + r.warnings.join("; ") : ""}`)}`;
+    const n = r.match?.leads.length ?? 0;
+    const info = r.match ? (n ? `Она отправлена ${n} подходящим поставщикам — ждите предложений (обычно в течение дня).` : `Подходящих поставщиков рядом пока не нашлось — заявка передана диспетчеру, он назначит исполнителя.`) : "";
+    return `/requests/${r.request.id}?ok=${encodeURIComponent(`Заявка опубликована. ${info}${r.warnings.length ? " Обратите внимание: " + r.warnings.join("; ") : ""}`)}`;
   });
 }
 
@@ -102,7 +104,9 @@ export async function broadcastAction(fd: FormData) {
     const tpl = await Rq.currentTemplate(cat);
     const values: Record<string, unknown> = {};
     for (const p of tpl.parameters) { if (p.field_type === "boolean") values[p.key] = bool(fd, `v_${p.key}`); else if (p.field_type === "multiselect") values[p.key] = fd.getAll(`v_${p.key}`).map(String); else if (p.field_type === "number") values[p.key] = num(fd, `v_${p.key}`) ?? ""; else values[p.key] = str(fd, `v_${p.key}`); }
-    const r = await Rq.broadcastRequests(s.user.id, company.id, { category_id: cat, project_ids: fd.getAll("project_ids").map(String), values, filter: { category_id: cat } });
+    const projectIds = fd.getAll("project_ids").map(String);
+    if (!projectIds.length) throw new Error("Отметьте хотя бы один объект, по которому нужна рассылка");
+    const r = await Rq.broadcastRequests(s.user.id, company.id, { category_id: cat, project_ids: projectIds, values, filter: { category_id: cat } });
     return `/outbox?ok=${encodeURIComponent(`Рассылка: ${r.results.length} заявок × ${r.recipients} поставщиков`)}`;
   });
 }

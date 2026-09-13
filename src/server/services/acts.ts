@@ -40,9 +40,9 @@ ${type === "supervisor_conclusion" ? `<p class="note">Заключение вы�
   const dir = path.join(config.uploadDir, "acts");
   await mkdir(dir, { recursive: true });
   const act = await prisma.act.create({ data: { deal_id: dealId, milestone_id: milestoneId, act_type: type, content_html: html, content_hash: hash, supervisor_id: extra.supervisor_id ?? null, sign_deadline_at: new Date(Date.now() + config.actSignDeadlineDays * 86400000) } });
-  const file = path.join(dir, `${act.id}.html`);
-  await writeFile(file, html, "utf8");
-  const saved = await prisma.act.update({ where: { id: act.id }, data: { file_url: `/uploads/acts/${act.id}.html` } });
+  // Файл — best-effort (на serverless-хостинге диск временный); источник истины — content_html в БД, отдаётся по /acts/<id>.
+  await writeFile(path.join(dir, `${act.id}.html`), html, "utf8").catch(() => null);
+  const saved = await prisma.act.update({ where: { id: act.id }, data: { file_url: `/acts/${act.id}` } });
   await logActivity({ actor_id: actorId, entity_type: "act", entity_id: act.id, action: "generated", meta: { type, hash } });
   await notify({ user_id: deal.buyer_id, type: "act.generated", payload: { act_id: act.id, deal_id: dealId } });
   await notifyCompany(deal.seller_id, { type: "act.generated", payload: { act_id: act.id, deal_id: dealId } });
