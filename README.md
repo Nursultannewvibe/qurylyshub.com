@@ -43,6 +43,13 @@ npm run dev        # http://localhost:3000   (или npm run build && npm start)
 - `npm run job <name>` — запустить джоб вручную (`rematch`, `reputation`, `predictive_timeline`, `deliver_deferred`, `lead_auto_refund`, `offer_reminders`, `expire_stale`, `expire_pitches`, `act_auto_dispute`, `retry_payments`, `reconciliation`, `billing`, `auto_soft_ban`, `license_reminders`).
 - `npm run db:reset` — полный сброс + сиды. `npm run db:studio` — Prisma Studio.
 
+### Развёртывание (Vercel + Neon)
+
+1. В Vercel задайте `DATABASE_URL` (pooled-строка Neon, хост с `-pooler`), `DATABASE_MIGRATE_URL` (direct-строка), `JWT_SECRET`, `DEV_OTP_CODE` (для демо) и остальное из `.env.example`.
+2. Миграции и сиды выполняются с локальной машины: `DATABASE_URL=… DATABASE_MIGRATE_URL=… npx prisma migrate deploy` и `… npm run db:seed` (сид делает `TRUNCATE`!).
+3. Роль приложения `qurylys_app` (append-only `activity_log`) на managed-хостинге автоматически не создаётся (Neon отклоняет слабый пароль). Чтобы включить ограничение в проде: до миграций выполните в SQL-консоли `CREATE ROLE qurylys_app WITH LOGIN PASSWORD '<сильный пароль>';`, затем `migrate deploy` выдаст права, а в `DATABASE_URL` укажите этого пользователя. Без этого приложение работает под владельцем базы и ограничение не действует.
+4. `package.json` содержит `allowScripts` для `prisma`/`@prisma/*`/`esbuild` — npm 12 иначе блокирует `prisma generate` при установке.
+
 ## 3. Тестовые аккаунты
 
 OTP-код в демо-режиме: **`000000`** (`DEV_OTP_CODE` в `.env`; принимается без предварительного запроса кода — только для dev).
