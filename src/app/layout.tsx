@@ -5,6 +5,8 @@ import { getSession } from "@/server/auth";
 import { getLocale } from "@/server/locale";
 import { t } from "@/lib/i18n";
 import { prisma } from "@/server/db";
+import { DemoSwitcher } from "@/components/demo-switcher";
+import { DEMO_ACCOUNTS, isDemoMode } from "@/server/demo";
 
 export const metadata: Metadata = { title: "Qurylys Hub", description: "Маркетплейс строительства и ремонта Казахстана" };
 export const dynamic = "force-dynamic";
@@ -43,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-7xl px-4 py-8 text-xs text-slate-400">{t(locale, "legal")}</footer>
+        {session && isDemoMode() && <DemoSwitcher accounts={DEMO_ACCOUNTS} currentPhone={session.user.phone} />}
       </body>
     </html>
   );
