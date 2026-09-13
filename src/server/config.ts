@@ -1,10 +1,12 @@
+// Пустые строки в env (типично для панелей хостинга) считаются незаданными.
+const str = (k: string, d: string) => process.env[k] || d;
 const int = (k: string, d: number) => { const v = process.env[k]; const n = v ? parseInt(v, 10) : NaN; return Number.isFinite(n) ? n : d; };
 const num = (k: string, d: number) => { const v = process.env[k]; const n = v ? parseFloat(v) : NaN; return Number.isFinite(n) ? n : d; };
 
 export const config = {
-  appUrl: process.env.APP_URL ?? "http://localhost:3000",
-  jwtSecret: process.env.JWT_SECRET ?? "dev-secret",
-  jwtTtl: process.env.JWT_TTL ?? "30d",
+  appUrl: str("APP_URL", "http://localhost:3000"),
+  jwtSecret: str("JWT_SECRET", "dev-secret"),
+  jwtTtl: str("JWT_TTL", "30d"),
   devOtpCode: process.env.DEV_OTP_CODE || null,
   otpMaxAttempts: 5,
   otpLockMinutes: 15,
@@ -17,15 +19,15 @@ export const config = {
   reviewWindowDays: int("REVIEW_WINDOW_DAYS", 30),
   pitchExpiresDays: int("PITCH_EXPIRES_DAYS", 7),
   aiParseDailyLimit: int("AI_PARSE_DAILY_LIMIT", 10),
-  uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
+  uploadDir: str("UPLOAD_DIR", "./uploads"),
   uploadMaxMb: int("UPLOAD_MAX_MB", 15),
-  paymentProvider: process.env.PAYMENT_PROVIDER ?? "mock",
-  paymentFallbackProvider: process.env.PAYMENT_FALLBACK_PROVIDER ?? "mock",
-  paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? "mock-webhook-secret",
+  paymentProvider: str("PAYMENT_PROVIDER", "mock"),
+  paymentFallbackProvider: str("PAYMENT_FALLBACK_PROVIDER", "mock"),
+  paymentWebhookSecret: str("PAYMENT_WEBHOOK_SECRET", "mock-webhook-secret"),
   mockPaymentFailRate: num("MOCK_PAYMENT_FAIL_RATE", 0),
-  schedulerEnabled: (process.env.SCHEDULER_ENABLED ?? "1") === "1",
+  schedulerEnabled: (str("SCHEDULER_ENABLED", "1")) === "1",
   schedulerIntervalSec: int("SCHEDULER_INTERVAL_SEC", 60),
-  llmModel: process.env.LLM_MODEL ?? "claude-sonnet-5",
+  llmModel: str("LLM_MODEL", "claude-sonnet-5"),
   anthropicKey: process.env.ANTHROPIC_API_KEY || null,
   timezone: "Asia/Almaty",
 };
