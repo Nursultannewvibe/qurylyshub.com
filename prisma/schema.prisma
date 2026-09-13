@@ -1,0 +1,1296 @@
+// Qurylys Hub — схема данных. Имена таблиц/полей соответствуют спеке (snake_case).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")          // роль приложения (без UPDATE/DELETE на activity_log)
+  directUrl = env("DATABASE_MIGRATE_URL")  // роль-владелец для миграций
+}
+
+// ───────────────────────── ENUMS ─────────────────────────
+enum UserStatus {
+  active
+  blocked
+}
+enum Role {
+  buyer
+  supplier
+  contractor
+  supervisor
+  admin
+}
+enum Locale {
+  ru
+  kk
+}
+enum LegalType {
+  ip
+  too
+  self_employed
+}
+enum CompanyRole {
+  supplier
+  contractor
+  buyer
+}
+enum Scale {
+  individual
+  small
+  medium
+  large
+}
+enum TaxStatus {
+  vat_payer
+  non_vat
+  simplified
+}
+enum MemberPermission {
+  owner
+  manager
+  estimator
+}
+enum VerificationDocType {
+  license
+  attestation
+  bin
+  registration
+}
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+}
+enum ExternalPlatform {
+  twogis
+  instagram
+  other
+}
+enum ProjectStatus {
+  draft
+  active
+  paused
+  completed
+  archived
+}
+enum RequestMode {
+  matched
+  direct
+  broadcast
+}
+enum RequestStatus {
+  draft
+  published
+  needs_dispatcher
+  expired
+  cancelled
+  closed
+}
+enum LeadOrigin {
+  matched
+  direct
+  broadcast
+  rematch
+  dispatcher
+}
+enum LeadStatus {
+  offered
+  declined
+  purchased
+  refunded
+}
+enum PitchStatus {
+  sent
+  viewed
+  accepted
+  declined
+  expired
+}
+enum OfferScope {
+  material_and_work
+  material_only
+  install_only
+}
+enum OfferStatus {
+  draft
+  sent
+  declined
+  not_selected
+  accepted
+  expired
+}
+enum DealStatus {
+  created
+  awaiting_payment
+  in_progress
+  completed
+  cancelled
+}
+enum CancelPolicy {
+  full_refund_before_start
+  partial_after_start
+  no_refund
+}
+enum DealItemPortion {
+  material
+  install
+  delivery
+}
+enum MilestoneStatus {
+  pending
+  funded
+  in_progress
+  submitted
+  accepted
+  partially_accepted
+  rejected
+}
+enum EscrowStatus {
+  held
+  released
+  refunded
+}
+enum ActType {
+  acceptance
+  reconciliation
+  supervisor_conclusion
+}
+enum ActStatus {
+  draft
+  signed
+  disputed
+}
+enum DisputeStatus {
+  open
+  in_review
+  resolved
+  rejected
+}
+enum DisputeCategory {
+  quality
+  deadline
+  payment
+  lead_refund
+  act_unsigned
+  other
+}
+enum WarrantyStatus {
+  open
+  in_progress
+  resolved
+  rejected
+}
+enum ConsentType {
+  personal_data
+  marketing
+}
+enum NotificationChannel {
+  in_app
+  push
+  sms
+  whatsapp
+  email
+}
+enum TransactionType {
+  credit
+  debit
+  hold
+  release
+  commission
+  lead_purchase
+  payout
+  refund
+}
+enum TransactionStatus {
+  pending
+  succeeded
+  failed
+}
+enum PaymentPurpose {
+  lead
+  milestone
+  subscription
+}
+enum PaymentStatus {
+  pending
+  retry_pending
+  succeeded
+  failed
+  refunded
+}
+enum PayoutStatus {
+  pending
+  approved
+  completed
+  rejected
+}
+enum SubscriptionPlan {
+  free
+  basic
+  pro
+}
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+}
+enum ReviewAuthorRole {
+  buyer
+  supervisor
+}
+enum ReviewDisputeStatus {
+  open
+  resolved
+  rejected
+}
+enum RatingTargetType {
+  company
+  user
+}
+enum FieldType {
+  number
+  text
+  select
+  multiselect
+  boolean
+  file
+}
+enum FileType {
+  plan
+  photo
+  document
+  voice
+  other
+}
+enum LabReportType {
+  concrete
+  soil
+  water
+  electrical
+  other
+}
+enum CommissioningStatus {
+  not_started
+  in_progress
+  commissioned
+}
+enum ResponsibilityLevel {
+  I
+  II
+  III
+}
+
+// ───────────────────────── USERS / AUTH ─────────────────────────
+model User {
+  id             String     @id @default(cuid())
+  phone          String     @unique
+  email          String?    @unique
+  alt_email      String?
+  name           String?
+  locale         Locale     @default(ru)
+  status         UserStatus @default(active)
+  referral_code  String     @unique
+  referred_by    String?
+  token_version  Int        @default(0) // «выйти со всех устройств» — инкремент инвалидирует все JWT
+  created_at     DateTime   @default(now())
+
+  roles                 UserRole[]
+  device_tokens         DeviceToken[]
+  notification_prefs    NotificationPreference[]
+  company_members       CompanyMember[]
+  projects              Project[]
+  project_members       ProjectMember[]
+  consents              Consent[]
+  notifications         Notification[]
+  phone_changes         PhoneChangeLog[]
+  messages              Message[]
+  reviews               Review[]
+  ratings               Rating[]
+  ai_parses             AiParse[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  phone      String
+  code       String
+  expires_at DateTime
+  consumed   Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+model OtpAttempt {
+  id              String    @id @default(cuid())
+  phone           String    @unique
+  attempt_count   Int       @default(0)
+  locked_until    DateTime?
+  last_attempt_at DateTime?
+
+  @@map("otp_attempts")
+}
+
+model PhoneChangeLog {
+  id         String   @id @default(cuid())
+  user_id    String
+  old_phone  String
+  new_phone  String
+  changed_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+
+  @@map("phone_change_log")
+}
+
+model DeviceToken {
+  id       String @id @default(cuid())
+  user_id  String
+  token    String
+  platform String
+  user     User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, token])
+  @@map("device_tokens")
+}
+
+model UserRole {
+  user_id String
+  role    Role
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, role])
+  @@map("user_roles")
+}
+
+model NotificationPreference {
+  user_id           String
+  channel           NotificationChannel
+  enabled           Boolean @default(true)
+  digest_mode       Boolean @default(false)
+  quiet_hours_start Int?    // час 0-23 локального времени (Asia/Almaty)
+  quiet_hours_end   Int?
+  user              User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, channel])
+  @@map("notification_preferences")
+}
+
+model Consent {
+  id           String      @id @default(cuid())
+  user_id      String
+  consent_type ConsentType
+  granted_at   DateTime    @default(now())
+  user         User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("consents")
+}
+
+// ───────────────────────── COMPANIES ─────────────────────────
+model Company {
+  id                   String      @id @default(cuid())
+  legal_type           LegalType
+  name                 String
+  bin                  String      @unique
+  bank_account         String?
+  registration_doc_url String?
+  role                 CompanyRole
+  scale                Scale       @default(small)
+  is_public            Boolean     @default(true)
+  public_slug          String      @unique
+  region               String?     // регион базирования (для каталога)
+  city                 String?
+  service_regions_json Json        @default("[]")
+  service_area_polygon Json?       // [[lat,lng],...] — см. README «Известные упрощения»
+  service_center_lat   Float?
+  service_center_lng   Float?
+  service_radius_km    Float?
+  categories_json      Json        @default("[]") // string[] category ids
+  rating               Float       @default(0)
+  portfolio_json       Json        @default("[]")
+  description          String?
+  tax_status           TaxStatus   @default(non_vat)
+  daily_lead_limit     Int         @default(5)
+  pitch_daily_limit    Int         @default(5)
+  pitch_cooldown_days  Int         @default(7)
+  soft_banned_until    DateTime?
+  soft_ban_reason      String?
+  created_at           DateTime    @default(now())
+
+  members           CompanyMember[]
+  verifications     Verification[]
+  external_profiles ExternalProfile[]
+  reputation        CompanyReputation?
+  projects          Project[]
+  leads             Lead[]
+  pitches           SupplierPitch[]
+  offers            Offer[]
+  offer_templates   OfferTemplate[]
+  wallet            Wallet?
+  payout_requests   PayoutRequest[]
+  subscriptions     Subscription[]
+  reviews_received  Review[]
+  review_responses  ReviewResponse[]
+  review_disputes   ReviewDispute[]
+  request_batches   RequestBatch[]
+  deals_as_seller   Deal[]           @relation("seller")
+  deals_as_buyer    Deal[]           @relation("buyer")
+
+  @@map("companies")
+}
+
+model CompanyMember {
+  user_id    String
+  company_id String
+  permission MemberPermission @default(manager)
+  user       User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  company    Company          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, company_id])
+  @@map("company_members")
+}
+
+model Verification {
+  id          String              @id @default(cuid())
+  company_id  String
+  category_id String?             // лицензия привязана к категории (null = общая регистрация/БИН)
+  doc_type    VerificationDocType
+  doc_url     String?
+  status      VerificationStatus  @default(pending)
+  valid_until DateTime?
+  created_at  DateTime            @default(now())
+  company     Company             @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@index([company_id, category_id, status])
+  @@map("verifications")
+}
+
+model ExternalProfile {
+  id         String           @id @default(cuid())
+  company_id String
+  platform   ExternalPlatform
+  url        String
+  company    Company          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@map("external_profiles")
+}
+
+model CompanyReputation {
+  id                    String   @id @default(cuid())
+  company_id            String   @unique
+  avg_rating            Float    @default(0)
+  deals_count           Int      @default(0)
+  on_time_pct           Float    @default(100)
+  disputes_open         Int      @default(0)
+  disputes_closed       Int      @default(0)
+  ai_summary_praise     String?
+  ai_summary_complaints String?
+  ai_summary_incidents  String?
+  updated_at            DateTime @default(now())
+  company               Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@map("company_reputation")
+}
+
+// ───────────────────────── REFERENCE DATA ─────────────────────────
+model Region {
+  id        String  @id @default(cuid())
+  code      String  @unique
+  name      String
+  name_kk   String
+  parent_id String?
+  lat       Float?
+  lng       Float?
+
+  @@map("regions")
+}
+
+model ObjectType {
+  code           String  @id
+  name           String
+  name_kk        String
+  is_renovation  Boolean @default(false)
+
+  @@map("object_types")
+}
+
+model RegulatoryRule {
+  id                   String              @id @default(cuid())
+  object_type          String?             // null = любой
+  construction_type    String?
+  min_area             Float?
+  max_area             Float?
+  min_floors           Int?
+  responsibility_level ResponsibilityLevel
+  needs_permit         Boolean
+  needs_expertise      Boolean
+  needs_tech_supervision Boolean
+  note                 String?
+  priority             Int                 @default(0)
+
+  @@map("regulatory_rules")
+}
+
+model Category {
+  id                        String   @id @default(cuid())
+  code                      String   @unique
+  name                      String
+  name_kk                   String
+  object_types_json         Json     @default("[]")
+  parent_id                 String?
+  required_license          Boolean  @default(false)
+  required_attestation      Boolean  @default(false)
+  seasonal_restrictions_json Json?   // {months:[11,12,1,2], message:"..."}
+  order_index               Int      @default(0)
+
+  templates       RequestTemplate[]
+  requests        Request[]
+  pitches         SupplierPitch[]
+  offer_templates OfferTemplate[]
+  checklists      AcceptanceChecklist[]
+  price_refs      PriceReference[]
+  batches         RequestBatch[]
+
+  @@map("categories")
+}
+
+model RequestTemplate {
+  id          String   @id @default(cuid())
+  category_id String
+  name        String
+  version     Int      @default(1)
+  is_current  Boolean  @default(true)
+  created_at  DateTime @default(now())
+  category    Category @relation(fields: [category_id], references: [id])
+  parameters  RequestParameter[]
+  requests    Request[]
+
+  @@unique([category_id, version])
+  @@map("request_templates")
+}
+
+model RequestParameter {
+  id           String    @id @default(cuid())
+  template_id  String
+  key          String
+  label        String
+  label_kk     String?
+  field_type   FieldType
+  required     Boolean   @default(false)
+  options_json Json?
+  unit         String?
+  hint         String?
+  order_index  Int       @default(0)
+  template     RequestTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
+
+  @@unique([template_id, key])
+  @@map("request_parameters")
+}
+
+model StageTypicalDuration {
+  id                String  @id @default(cuid())
+  object_type       String
+  construction_type String?
+  stage_name        String
+  order_index       Int
+  typical_days      Int
+  category_code     String? // какая категория обычно нужна на этом этапе (для предиктивного таймлайна)
+
+  @@map("stage_typical_duration")
+}
+
+model CommissionTier {
+  id         String  @id @default(cuid())
+  min_amount Decimal @db.Decimal(14, 2)
+  max_amount Decimal? @db.Decimal(14, 2)
+  percent    Decimal @db.Decimal(5, 2)
+
+  @@map("commission_tiers")
+}
+
+model PriceReference {
+  id          String   @id @default(cuid())
+  category_id String
+  region      String
+  unit        String
+  price_min   Decimal  @db.Decimal(14, 2)
+  price_avg   Decimal  @db.Decimal(14, 2)
+  price_max   Decimal  @db.Decimal(14, 2)
+  updated_at  DateTime @default(now())
+  category    Category @relation(fields: [category_id], references: [id])
+
+  @@map("price_reference")
+}
+
+model AcceptanceChecklist {
+  id             String   @id @default(cuid())
+  category_id    String
+  item_text      String
+  item_text_kk   String?
+  order_index    Int      @default(0)
+  photo_required Boolean  @default(false)
+  category       Category @relation(fields: [category_id], references: [id])
+  results        ChecklistResult[]
+
+  @@map("acceptance_checklists")
+}
+
+// ───────────────────────── PROJECTS ─────────────────────────
+model Project {
+  id                     String   @id @default(cuid())
+  owner_id               String
+  company_id             String?
+  parent_project_id      String?
+  name                   String
+  object_type            String
+  construction_type      String?
+  region                 String
+  city                   String
+  district               String?
+  address                String?
+  geo_lat                Float?
+  geo_lng                Float?
+  area                   Float?
+  rooms                  Int?
+  floor                  Int?
+  floors                 Int?
+  stage                  String?
+  deadline               DateTime?
+  budget_min             Decimal? @db.Decimal(14, 2)
+  budget_max             Decimal? @db.Decimal(14, 2)
+  open_to_pitches        Boolean  @default(false)
+  land_purpose           String?
+  seismicity             Int?
+  responsibility_level   ResponsibilityLevel?
+  needs_permit           Boolean?
+  needs_expertise        Boolean?
+  needs_tech_supervision Boolean?
+  tu_electric            Boolean  @default(false)
+  tu_gas                 Boolean  @default(false)
+  tu_water               Boolean  @default(false)
+  tu_sewer               Boolean  @default(false)
+  tu_heat                Boolean  @default(false)
+  commissioning_status   CommissioningStatus @default(not_started)
+  status                 ProjectStatus @default(active)
+  created_at             DateTime @default(now())
+
+  owner     User      @relation(fields: [owner_id], references: [id])
+  company   Company?  @relation(fields: [company_id], references: [id])
+  parent    Project?  @relation("children", fields: [parent_project_id], references: [id])
+  children  Project[] @relation("children")
+  files     ProjectFile[]
+  members   ProjectMember[]
+  stages    ConstructionStage[]
+  schedule  StageSchedule[]
+  requests  Request[]
+  pitches   SupplierPitch[]
+  lab_reports LabReport[]
+  ai_parses AiParse[]
+
+  @@index([owner_id])
+  @@index([open_to_pitches, status])
+  @@map("projects")
+}
+
+model ProjectFile {
+  id         String   @id @default(cuid())
+  project_id String
+  type       FileType
+  url        String
+  name       String?
+  size_bytes Int?
+  validated  Boolean  @default(false)
+  created_at DateTime @default(now())
+  project    Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("project_files")
+}
+
+model ProjectMember {
+  project_id String
+  user_id    String
+  permission MemberPermission @default(manager)
+  project    Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user       User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([project_id, user_id])
+  @@map("project_members")
+}
+
+model ConstructionStage {
+  id           String  @id @default(cuid())
+  project_id   String
+  name         String
+  order_index  Int
+  selected     Boolean @default(true)
+  progress_pct Int     @default(0)
+  category_code String?
+  project      Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  schedule     StageSchedule[]
+  requests     Request[]
+  deps         StageDependency[] @relation("stage")
+  dependents   StageDependency[] @relation("depends_on")
+
+  @@map("construction_stages")
+}
+
+model StageSchedule {
+  id                              String    @id @default(cuid())
+  project_id                      String
+  stage_id                        String
+  planned_start                   DateTime?
+  planned_end                     DateTime?
+  predicted_next_need_category_id String?
+  predicted_date                  DateTime?
+  actual_date                     DateTime?
+  lead_time_days                  Int       @default(14)
+  notified_at                     DateTime?
+  project                         Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  stage                           ConstructionStage @relation(fields: [stage_id], references: [id], onDelete: Cascade)
+
+  @@map("stage_schedule")
+}
+
+model StageDependency {
+  stage_id            String
+  depends_on_stage_id String
+  stage               ConstructionStage @relation("stage", fields: [stage_id], references: [id], onDelete: Cascade)
+  depends_on          ConstructionStage @relation("depends_on", fields: [depends_on_stage_id], references: [id], onDelete: Cascade)
+
+  @@id([stage_id, depends_on_stage_id])
+  @@map("stage_dependencies")
+}
+
+// ───────────────────────── REQUESTS / LEADS / PITCHES ─────────────────────────
+model Request {
+  id                String        @id @default(cuid())
+  project_id        String
+  stage_id          String?
+  category_id       String
+  template_id       String
+  template_version  Int
+  mode              RequestMode   @default(matched)
+  values_json       Json          @default("{}")
+  ai_extracted_json Json?
+  version           Int           @default(1)
+  status            RequestStatus @default(draft)
+  radius_expanded   Boolean       @default(false)
+  expires_at        DateTime?
+  published_at      DateTime?
+  created_at        DateTime      @default(now())
+
+  project  Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  stage    ConstructionStage? @relation(fields: [stage_id], references: [id])
+  category Category @relation(fields: [category_id], references: [id])
+  template RequestTemplate @relation(fields: [template_id], references: [id])
+  leads    Lead[]
+  offers   Offer[]
+  threads  Thread[]
+  deals    Deal[]
+  batch_items RequestBatchItem[]
+
+  @@index([status])
+  @@map("requests")
+}
+
+model RequestBatch {
+  id                    String   @id @default(cuid())
+  created_by_company_id String
+  category_id           String
+  filter_json           Json
+  created_at            DateTime @default(now())
+  company  Company  @relation(fields: [created_by_company_id], references: [id])
+  category Category @relation(fields: [category_id], references: [id])
+  items    RequestBatchItem[]
+
+  @@map("request_batches")
+}
+
+model RequestBatchItem {
+  batch_id   String
+  request_id String
+  batch      RequestBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+  request    Request      @relation(fields: [request_id], references: [id], onDelete: Cascade)
+
+  @@id([batch_id, request_id])
+  @@map("request_batch_items")
+}
+
+model SupplierPitch {
+  id             String      @id @default(cuid())
+  company_id     String
+  project_id     String
+  category_id    String
+  message        String
+  price_estimate Decimal?    @db.Decimal(14, 2)
+  status         PitchStatus @default(sent)
+  expires_at     DateTime
+  created_at     DateTime    @default(now())
+  company  Company  @relation(fields: [company_id], references: [id])
+  project  Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id])
+
+  @@index([company_id, created_at])
+  @@map("supplier_pitches")
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  request_id   String
+  company_id   String
+  origin       LeadOrigin
+  price        Decimal    @db.Decimal(14, 2)
+  status       LeadStatus @default(offered)
+  purchased_at DateTime?
+  created_at   DateTime   @default(now())
+  request Request @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [company_id], references: [id])
+  payments Payment[]
+
+  @@unique([request_id, company_id])
+  @@index([company_id, status])
+  @@map("leads")
+}
+
+// ───────────────────────── CHAT / NOTIFICATIONS ─────────────────────────
+model Thread {
+  id         String   @id @default(cuid())
+  request_id String
+  buyer_id   String   // user id заказчика
+  seller_id  String   // company id поставщика
+  created_at DateTime @default(now())
+  request  Request   @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([request_id, seller_id])
+  @@map("threads")
+}
+
+model Message {
+  id                   String   @id @default(cuid())
+  thread_id            String
+  sender_id            String
+  body                 String
+  attachments_json     Json     @default("[]")
+  flagged_contact_leak Boolean  @default(false)
+  created_at           DateTime @default(now())
+  thread Thread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  sender User   @relation(fields: [sender_id], references: [id])
+
+  @@map("messages")
+}
+
+model Notification {
+  id             String              @id @default(cuid())
+  user_id        String
+  type           String
+  channel        NotificationChannel
+  payload_json   Json                @default("{}")
+  dedup_key      String?
+  read           Boolean             @default(false)
+  sent_at        DateTime?
+  deferred_until DateTime?
+  digest_batch_id String?
+  created_at     DateTime            @default(now())
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, read])
+  @@index([user_id, dedup_key])
+  @@map("notifications")
+}
+
+// ───────────────────────── OFFERS / DEALS ─────────────────────────
+model Offer {
+  id               String      @id @default(cuid())
+  request_id       String
+  company_id       String
+  offer_scope      OfferScope  @default(material_and_work)
+  material_json    Json        @default("[]") // [{name, qty, unit, price}]
+  attachments_json Json        @default("[]")
+  material_cost    Decimal     @default(0) @db.Decimal(14, 2)
+  work_cost        Decimal     @default(0) @db.Decimal(14, 2)
+  delivery_cost    Decimal     @default(0) @db.Decimal(14, 2)
+  delivery_days    Int?
+  execution_days   Int?
+  warranty         String?
+  total            Decimal     @db.Decimal(14, 2)
+  matches_params   Boolean     @default(true)
+  mismatch_notes   String?
+  suspicious_cheap Boolean     @default(false)
+  valid_until      DateTime?
+  version          Int         @default(1)
+  status           OfferStatus @default(draft)
+  created_at       DateTime    @default(now())
+  updated_at       DateTime    @default(now()) @updatedAt
+  request Request @relation(fields: [request_id], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [company_id], references: [id])
+  deals   Deal[]
+  deal_items DealItem[]
+
+  @@index([request_id, status])
+  @@map("offers")
+}
+
+model OfferTemplate {
+  id                   String   @id @default(cuid())
+  company_id           String
+  category_id          String
+  name                 String
+  template_values_json Json
+  company  Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id])
+
+  @@map("offer_templates")
+}
+
+model Deal {
+  id                 String       @id @default(cuid())
+  request_id         String
+  offer_id           String       // основной оффер (при разделённом выборе — первый)
+  buyer_id           String       // user id
+  buyer_company_id   String?
+  seller_id          String       // company id
+  amount             Decimal      @db.Decimal(14, 2)
+  currency           String       @default("KZT")
+  commission_percent Decimal      @db.Decimal(5, 2)
+  commission_amount  Decimal      @db.Decimal(14, 2)
+  penalty_amount     Decimal      @default(0) @db.Decimal(14, 2)
+  penalty_pct_per_day Decimal     @default(0.1) @db.Decimal(5, 2)
+  cancel_policy      CancelPolicy @default(full_refund_before_start)
+  work_started_at    DateTime?
+  status             DealStatus   @default(created)
+  flagged_suspicious Boolean      @default(false)
+  contacts_revealed  Boolean      @default(true)
+  completed_at       DateTime?
+  cancelled_at       DateTime?
+  created_at         DateTime     @default(now())
+  request   Request  @relation(fields: [request_id], references: [id])
+  offer     Offer    @relation(fields: [offer_id], references: [id])
+  seller    Company  @relation("seller", fields: [seller_id], references: [id])
+  buyer_company Company? @relation("buyer", fields: [buyer_company_id], references: [id])
+  items      DealItem[]
+  milestones Milestone[]
+  escrow_holds EscrowHold[]
+  acts       Act[]
+  disputes   Dispute[]
+  warranty_claims WarrantyClaim[]
+  payments   Payment[]
+  reviews    Review[]
+  ratings    Rating[]
+
+  @@index([seller_id])
+  @@index([buyer_id])
+  @@map("deals")
+}
+
+model DealItem {
+  id       String          @id @default(cuid())
+  deal_id  String
+  offer_id String
+  portion  DealItemPortion
+  amount   Decimal         @db.Decimal(14, 2)
+  deal  Deal  @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offer_id], references: [id])
+
+  @@map("deal_items")
+}
+
+model Milestone {
+  id              String          @id @default(cuid())
+  deal_id         String
+  name            String
+  order_index     Int
+  amount          Decimal         @db.Decimal(14, 2)
+  accepted_amount Decimal?        @db.Decimal(14, 2)
+  due_date        DateTime?
+  status          MilestoneStatus @default(pending)
+  submitted_at    DateTime?
+  accepted_at     DateTime?
+  deal Deal @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  escrow_holds EscrowHold[]
+  acts Act[]
+  checklist_results ChecklistResult[]
+  disputes Dispute[]
+
+  @@map("milestones")
+}
+
+model EscrowHold {
+  id                    String       @id @default(cuid())
+  deal_id               String
+  milestone_id          String
+  amount                Decimal      @db.Decimal(14, 2)
+  status                EscrowStatus @default(held)
+  provider_ref          String?
+  blocked_by_dispute_id String?
+  released_at           DateTime?
+  created_at            DateTime     @default(now())
+  deal      Deal      @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  milestone Milestone @relation(fields: [milestone_id], references: [id], onDelete: Cascade)
+
+  @@map("escrow_holds")
+}
+
+model Act {
+  id                  String    @id @default(cuid())
+  deal_id             String
+  act_type            ActType
+  milestone_id        String?
+  file_url            String?
+  content_html        String?
+  signed_by_buyer_at  DateTime?
+  signed_by_seller_at DateTime?
+  supervisor_id       String?
+  signed_by_supervisor_at DateTime?
+  buyer_signature_ref String?
+  seller_signature_ref String?
+  supervisor_signature_ref String?
+  content_hash        String?
+  sign_deadline_at    DateTime?
+  status              ActStatus @default(draft)
+  created_at          DateTime  @default(now())
+  deal      Deal       @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  milestone Milestone? @relation(fields: [milestone_id], references: [id])
+
+  @@map("acts")
+}
+
+model ChecklistResult {
+  id                String  @id @default(cuid())
+  milestone_id      String
+  checklist_item_id String
+  checked           Boolean @default(false)
+  photo_url         String?
+  checked_by        String?
+  milestone Milestone           @relation(fields: [milestone_id], references: [id], onDelete: Cascade)
+  item      AcceptanceChecklist @relation(fields: [checklist_item_id], references: [id])
+
+  @@unique([milestone_id, checklist_item_id])
+  @@map("checklist_results")
+}
+
+model Dispute {
+  id           String          @id @default(cuid())
+  deal_id      String
+  milestone_id String?
+  opened_by    String          // user id
+  reason       String
+  category     DisputeCategory @default(other)
+  status       DisputeStatus   @default(open)
+  resolution   String?
+  created_at   DateTime        @default(now())
+  resolved_at  DateTime?
+  deal      Deal       @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  milestone Milestone? @relation(fields: [milestone_id], references: [id])
+
+  @@index([milestone_id, status])
+  @@map("disputes")
+}
+
+model WarrantyClaim {
+  id          String         @id @default(cuid())
+  deal_id     String
+  description String
+  photo_url   String?
+  status      WarrantyStatus @default(open)
+  created_at  DateTime       @default(now())
+  resolved_at DateTime?
+  deal Deal @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+
+  @@map("warranty_claims")
+}
+
+model LabReport {
+  id              String        @id @default(cuid())
+  project_id      String
+  lab_name        String
+  report_type     LabReportType
+  file_url        String?
+  verdict_summary String?
+  uploaded_by     String
+  verified        Boolean       @default(false)
+  created_at      DateTime      @default(now())
+  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@map("lab_reports")
+}
+
+model AiParse {
+  id           String   @id @default(cuid())
+  user_id      String
+  project_id   String?
+  category_id  String?
+  input_kind   String   // text|photo|voice|plan
+  sent_prompt  String   // ЧТО РЕАЛЬНО УШЛО в LLM (без ПДн) — для аудита приватности
+  result_json  Json?
+  provider     String
+  created_at   DateTime @default(now())
+  user    User     @relation(fields: [user_id], references: [id])
+  project Project? @relation(fields: [project_id], references: [id])
+
+  @@index([user_id, created_at])
+  @@map("ai_parses")
+}
+
+// ───────────────────────── MONEY ─────────────────────────
+model Wallet {
+  id         String  @id @default(cuid())
+  company_id String  @unique
+  balance    Decimal @default(0) @db.Decimal(14, 2)
+  currency   String  @default("KZT")
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  wallet_id       String
+  type            TransactionType
+  amount          Decimal           @db.Decimal(14, 2)
+  currency        String            @default("KZT")
+  provider        String?
+  provider_ref    String?
+  idempotency_key String?           @unique
+  status          TransactionStatus @default(succeeded)
+  meta_json       Json?
+  created_at      DateTime          @default(now())
+  wallet Wallet @relation(fields: [wallet_id], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  deal_id         String?
+  lead_id         String?
+  milestone_id    String?
+  payer_id        String        // user id
+  purpose         PaymentPurpose
+  amount          Decimal       @db.Decimal(14, 2)
+  currency        String        @default("KZT")
+  provider        String
+  provider_ref    String?
+  idempotency_key String        @unique
+  status          PaymentStatus @default(pending)
+  attempts        Int           @default(0)
+  last_error      String?
+  reconciled_at   DateTime?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @default(now()) @updatedAt
+  deal Deal? @relation(fields: [deal_id], references: [id])
+  lead Lead? @relation(fields: [lead_id], references: [id])
+
+  @@map("payments")
+}
+
+model PayoutRequest {
+  id           String       @id @default(cuid())
+  company_id   String
+  amount       Decimal      @db.Decimal(14, 2)
+  bank_account String
+  status       PayoutStatus @default(pending)
+  requested_at DateTime     @default(now())
+  processed_at DateTime?
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@map("payout_requests")
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  company_id      String
+  plan            SubscriptionPlan
+  price           Decimal            @db.Decimal(14, 2)
+  period          String             @default("month")
+  status          SubscriptionStatus @default(active)
+  next_billing_at DateTime?
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ───────────────────────── REPUTATION ─────────────────────────
+model Review {
+  id                String           @id @default(cuid())
+  deal_id           String
+  author_id         String
+  author_role       ReviewAuthorRole @default(buyer)
+  target_company_id String
+  rating            Int
+  text              String?
+  verified          Boolean          @default(false)
+  weight            Float            @default(1)
+  photo_urls_json   Json             @default("[]")
+  flagged_suspicious Boolean         @default(false)
+  created_at        DateTime         @default(now())
+  deal   Deal    @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  author User    @relation(fields: [author_id], references: [id])
+  target Company @relation(fields: [target_company_id], references: [id], onDelete: Cascade)
+  responses ReviewResponse[]
+  disputes  ReviewDispute[]
+
+  @@unique([deal_id, author_id])
+  @@map("reviews")
+}
+
+model ReviewResponse {
+  id         String   @id @default(cuid())
+  review_id  String
+  company_id String
+  text       String
+  created_at DateTime @default(now())
+  review  Review  @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [company_id], references: [id])
+
+  @@map("review_responses")
+}
+
+model ReviewDispute {
+  id                   String              @id @default(cuid())
+  review_id            String
+  opened_by_company_id String
+  reason               String
+  status               ReviewDisputeStatus @default(open)
+  created_at           DateTime            @default(now())
+  review  Review  @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [opened_by_company_id], references: [id])
+
+  @@map("review_disputes")
+}
+
+model Rating {
+  id          String           @id @default(cuid())
+  deal_id     String
+  author_id   String
+  target_type RatingTargetType
+  target_id   String
+  rating      Int
+  text        String?
+  created_at  DateTime         @default(now())
+  deal   Deal @relation(fields: [deal_id], references: [id], onDelete: Cascade)
+  author User @relation(fields: [author_id], references: [id])
+
+  @@unique([deal_id, author_id, target_type, target_id])
+  @@map("ratings")
+}
+
+// ───────────────────────── AUDIT ─────────────────────────
+// append-only: роль приложения не имеет UPDATE/DELETE (см. миграцию 0002_activity_log_append_only)
+model ActivityLog {
+  id            String   @id @default(cuid())
+  actor_id      String?
+  entity_type   String
+  entity_id     String
+  action        String
+  meta_json     Json?
+  previous_hash String?
+  hash          String
+  created_at    DateTime @default(now())
+
+  @@index([entity_type, entity_id])
+  @@map("activity_log")
+}

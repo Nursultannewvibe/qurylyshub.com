@@ -1,0 +1,31 @@
+const int = (k: string, d: number) => { const v = process.env[k]; const n = v ? parseInt(v, 10) : NaN; return Number.isFinite(n) ? n : d; };
+const num = (k: string, d: number) => { const v = process.env[k]; const n = v ? parseFloat(v) : NaN; return Number.isFinite(n) ? n : d; };
+
+export const config = {
+  appUrl: process.env.APP_URL ?? "http://localhost:3000",
+  jwtSecret: process.env.JWT_SECRET ?? "dev-secret",
+  jwtTtl: process.env.JWT_TTL ?? "30d",
+  devOtpCode: process.env.DEV_OTP_CODE || null,
+  otpMaxAttempts: 5,
+  otpLockMinutes: 15,
+  matchMaxRecipients: int("MATCH_MAX_RECIPIENTS", 6),
+  fallbackRadiusMultiplier: num("MATCH_FALLBACK_RADIUS_MULTIPLIER", 2),
+  leadPriceDefault: num("LEAD_PRICE_DEFAULT", 2000),
+  leadAutoRefundHours: int("LEAD_AUTO_REFUND_HOURS", 48),
+  offerReminderDays: int("OFFER_REMINDER_DAYS", 3),
+  actSignDeadlineDays: int("ACT_SIGN_DEADLINE_DAYS", 5),
+  reviewWindowDays: int("REVIEW_WINDOW_DAYS", 30),
+  pitchExpiresDays: int("PITCH_EXPIRES_DAYS", 7),
+  aiParseDailyLimit: int("AI_PARSE_DAILY_LIMIT", 10),
+  uploadDir: process.env.UPLOAD_DIR ?? "./uploads",
+  uploadMaxMb: int("UPLOAD_MAX_MB", 15),
+  paymentProvider: process.env.PAYMENT_PROVIDER ?? "mock",
+  paymentFallbackProvider: process.env.PAYMENT_FALLBACK_PROVIDER ?? "mock",
+  paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? "mock-webhook-secret",
+  mockPaymentFailRate: num("MOCK_PAYMENT_FAIL_RATE", 0),
+  schedulerEnabled: (process.env.SCHEDULER_ENABLED ?? "1") === "1",
+  schedulerIntervalSec: int("SCHEDULER_INTERVAL_SEC", 60),
+  llmModel: process.env.LLM_MODEL ?? "claude-sonnet-5",
+  anthropicKey: process.env.ANTHROPIC_API_KEY || null,
+  timezone: "Asia/Almaty",
+};

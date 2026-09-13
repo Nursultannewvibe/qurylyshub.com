@@ -1,0 +1,41 @@
+{
+  "name": "qurylys-hub",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "db:setup": "bash scripts/db-setup.sh",
+    "db:migrate": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset --force --skip-seed && npm run db:seed",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "job": "tsx scripts/run-job.ts",
+    "scenarios": "tsx scripts/scenarios.ts",
+    "smoke:http": "tsx scripts/http-smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
+    "@prisma/client": "6.19.3",
+    "jose": "^6.2.12",
+    "next": "15.5.25",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "autoprefixer": "^10.4.21",
+    "dotenv": "^17.4.2",
+    "postcss": "^8.5.0",
+    "prisma": "6.19.3",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.0"
+  }
+}
