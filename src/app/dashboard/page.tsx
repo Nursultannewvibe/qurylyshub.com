@@ -32,6 +32,13 @@ export default async function Dashboard() {
   else if (isSupplierRole && myLeadsPurchased > 0) next = { text: `По ${myLeadsPurchased} заявкам вы ещё не отправили коммерческое предложение.`, href: "/supplier/leads", cta: "Отправить КП" };
   else if (pendingActs > 0) next = { text: `Есть ${pendingActs} актов, ожидающих подписи.`, href: "/deals", cta: "К сделкам" };
   else if (deals.some((d) => d.status === "awaiting_payment") && isBuyerRole) next = { text: "Сделка создана — оплатите первый этап: деньги удерживаются платформой (эскроу) и уходят исполнителю только после вашей приёмки.", href: `/deals/${deals.find((d) => d.status === "awaiting_payment")!.id}`, cta: "Оплатить этап" };
+  else {
+    const submitted = await prisma.milestone.findFirst({ where: { status: "submitted", deal: { buyer_id: s.user.id } }, select: { deal_id: true } });
+    const funded = await prisma.milestone.findFirst({ where: { status: { in: ["funded", "in_progress"] }, deal: { seller_id: { in: cids } } }, select: { deal_id: true, status: true } });
+    if (submitted) next = { text: "Исполнитель сдал этап — проверьте работу по чек-листу (критичные пункты с фото) и примите этап.", href: `/deals/${submitted.deal_id}`, cta: "Проверить и принять" };
+    else if (funded) next = { text: funded.status === "funded" ? "Заказчик оплатил этап, деньги в эскроу — можно начинать работы." : "Этап в работе — когда закончите, нажмите «Сдать этап», и заказчик проверит по чек-листу.", href: `/deals/${funded.deal_id}`, cta: "Открыть сделку" };
+    else if (isBuyerRole && myRequests > 0) next = { text: `По ${myRequests} заявкам ждём предложений поставщиков — вы получите уведомление. Можно пока создать заявки по другим этапам.`, href: "/outbox", cta: "Исходящие заявки" };
+  }
   const tiles: [string, string | number, string][] = [];
   if (roles.includes("buyer")) tiles.push(["Объектов", projects, "/projects"], ["Новых КП", offers, "/inbox"]);
   if (roles.includes("supplier") || roles.includes("contractor")) tiles.push(["Новых лидов", leads, "/supplier/leads"]);
