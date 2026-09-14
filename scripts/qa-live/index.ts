@@ -93,13 +93,14 @@ const wallet = async (companyId: string) => Number((await prisma.wallet.findUniq
   await run("L4", "Крупный заказчик", "Стены (БетонСервис) кафе — happy", "happy/seed", async (st) => { const r = await createRequest(big, cafe.id, "walls"); st.push(r.flash); const h = await happyCycle(big, con, r.id, photo, { sellerCompanyId: conC }); st.push(...h.steps); });
   const inUser = await registerUser("Асхат (ИнжСети Тест)", "supplier");
   const inz = await registerCompany(inUser, { name: "ИнжСети Тест", legal_type: "too", role: "supplier", doc: JPG, docType: "image/jpeg", categories: ["eng_water_sewer", "eng_heating", "eng_hvac", "eng_smart_home", "eng_cctv"] });
-  await run("L5", "Крупный заказчик", "Отопление (новая ИнжСети) — unhappy: отмена после оплаты до начала работ → полный возврат", "unhappy/new", async (st) => {
+  await run("L5", "Крупный заказчик", "Отопление (новая ИнжСети) — unhappy: отмена после оплаты до начала работ → полный возврат; затем happy", "unhappy+happy/new", async (st) => {
     assert(inz.company, "регистрация ИнжСети: " + inz.flash); const tu = await topUp(inUser, 20000); assert(!tu.error, tu.flash); st.push("пополнение: " + tu.flash);
     const r = await createRequest(big, wh.id, "eng_heating"); await buyLead(inUser, r.id); const o = await sendOffer(inUser, r.id, { material: 50000, work: 300000 }); assert(!o.error, o.flash);
     const d = await createDeal(big, r.id); const p = await payMilestone(big, d.id); assert(/succeeded/.test(p.flash), p.flash);
     const c = await cancelDeal(big, d.id); assert(!c.error, c.flash); st.push(c.flash);
     const deal = await prisma.deal.findUniqueOrThrow({ where: { id: d.id }, include: { escrow_holds: true } }); assert.equal(deal.status, "cancelled"); assert(deal.escrow_holds.every((h) => h.status === "refunded"), "эскроу возвращён заказчику");
-    const sp = await page(`/deals/${d.id}`, inUser); assert(sp.text.includes("отменена"), "исполнитель видит отмену"); return "сделка отменена, эскроу refunded";
+    const sp = await page(`/deals/${d.id}`, inUser); assert(sp.text.includes("отменена"), "исполнитель видит отмену"); st.push("сделка отменена, эскроу refunded");
+    const r2 = await createRequest(big, cafe.id, "eng_heating"); const h = await happyCycle(big, inUser, r2.id, photo, { sellerCompanyId: inz.company!.id }); st.push(...h.steps); return "отмена (полный возврат) + happy";
   });
   await run("L6", "Крупный заказчик", "Газоснабжение — happy после verified лицензии; unhappy: просроченная лицензия исключает из матчинга", "happy+unhappy/new", async (st) => {
     const gas = await catByCode("eng_gas"); const up = await uploadVerification(enUser, "license", gas.id, JPG2, "2028-12-31", "image/jpeg"); assert(!up.error, up.flash);
@@ -259,9 +260,10 @@ const wallet = async (companyId: string) => Number((await prisma.wallet.findUniq
   const nbHouse = await createProject(nb, { name: "Новый дом", object_type: "house", construction_type: "new", region: "kaskelen", city: "Каскелен", address: "QA новый 2", area: "120", floors: "1", open_to_pitches: "on" });
   const otUser = await registerUser("Талгат (ОтделкаПро)", "contractor");
   const ot = await registerCompany(otUser, { name: "ОтделкаПро Тест", legal_type: "ip", role: "contractor", doc: JPG, docType: "image/jpeg", categories: ["reno_demolition", "reno_ceiling", "reno_floor", "reno_doors", "reno_paint"] });
-  await run("N1", "Новый заказчик + новый подрядчик", "Демонтаж — happy (оба аккаунта зарегистрированы через формы, талон ИП JPG)", "happy/new", async (st) => {
+  await run("N1", "Новый заказчик + новый подрядчик", "Демонтаж — happy (оба аккаунта зарегистрированы через формы, талон ИП JPG); unhappy: отказ от лида", "happy+unhappy/new", async (st) => {
     assert(ot.company, ot.flash); st.push("регистрация ОтделкаПро: " + ot.flash); const tu = await topUp(otUser, 30000); assert(!tu.error, tu.flash);
     const dash = await page("/dashboard", nb); assert(dash.text.includes("Следующий шаг"), "новому заказчику показан следующий шаг"); const r = await createRequest(nb, nbFlat.id, "reno_demolition"); st.push(r.flash); const h = await happyCycle(nb, otUser, r.id, photo, { sellerCompanyId: ot.company!.id, offer: { scope: "install_only", work: 80000 } }); st.push(...h.steps);
+    const r2 = await createRequest(nb, nbFlat.id, "reno_demolition"); const dl = await declineLead(otUser, r2.id); assert(!dl.error, dl.flash); const rp = await page(`/requests/${r2.id}`, nb); assert(rp.text.includes("отказалась"), "заказчик видит, что подрядчик отказался"); st.push("вторая заявка: подрядчик отказался — заказчик видит статус"); return "happy + отказ от лида";
   });
   await run("N2", "Новый подрядчик", "Потолки — happy; unhappy: частичная приёмка без пени", "happy+unhappy/new", async (st) => {
     const r = await createRequest(nb, nbFlat.id, "reno_ceiling"); const h = await happyCycle(nb, otUser, r.id, photo, { sellerCompanyId: ot.company!.id, offer: { scope: "install_only", work: 90000 } }); st.push(...h.steps);
@@ -277,9 +279,12 @@ const wallet = async (companyId: string) => Number((await prisma.wallet.findUniq
     const before = await wallet(ot.company!.id); const c = await cancelDeal(nb, d.id); assert(!c.error, c.flash); st.push(c.flash); const after = await wallet(ot.company!.id); assert(after > before, `исполнителю выплачена часть: ${before} → ${after}`);
     const r2 = await createRequest(nb, nbFlat.id, "reno_doors"); const h = await happyCycle(nb, otUser, r2.id, photo, { sellerCompanyId: ot.company!.id, offer: { scope: "install_only", work: 60000 } }); st.push(...h.steps); return `отмена после старта: +${after - before} ₸ исполнителю; happy`;
   });
-  await run("N5", "Новый подрядчик", "Малярка — happy (фото отзыва → портфолио)", "happy/new", async (st) => {
+  await run("N5", "Новый подрядчик", "Малярка — happy (фото отзыва → портфолио); unhappy: оспаривание отзыва отклонено", "happy+unhappy/new", async (st) => {
     const r = await createRequest(nb, nbFlat.id, "reno_paint"); const h = await happyCycle(nb, otUser, r.id, photo, { sellerCompanyId: ot.company!.id, offer: { scope: "install_only", work: 70000 } }); st.push(...h.steps);
-    const c = await prisma.company.findUniqueOrThrow({ where: { id: ot.company!.id } }); assert((c.portfolio_json as unknown[]).length > 0, "фото отзыва в портфолио"); const cp = await page(`/catalog/${c.public_slug}`); assert(/src="data:image/.test(cp.html), "превью в карточке"); return "портфолио с превью";
+    const c = await prisma.company.findUniqueOrThrow({ where: { id: ot.company!.id } }); assert((c.portfolio_json as unknown[]).length > 0, "фото отзыва в портфолио"); const cp = await page(`/catalog/${c.public_slug}`); assert(/src="(data:image|\/f\/)/.test(cp.html), "превью в карточке");
+    const rev = await prisma.review.findFirstOrThrow({ where: { deal_id: h.dealId } }); const dsp = await submit(`/catalog/${c.public_slug}`, otUser, (f) => f.hidden.review_id === rev.id && f.inputs.includes("reason"), { reason: "QA: не согласны с оценкой" }); assert(!dsp.error, dsp.flash);
+    const rd = await prisma.reviewDispute.findFirstOrThrow({ where: { review_id: rev.id } }); const res = await submit("/admin", adm, (f) => f.hidden.review_dispute_id === rd.id, {}, { button: { name: "outcome", value: "rejected" }, noDefaults: true }); assert(!res.error, res.flash);
+    const cp2 = await page(`/catalog/${c.public_slug}`); assert(cp2.text.includes("QA: отличная работа"), "отзыв остался после отклонённого оспаривания"); return "портфолио с превью; оспаривание отзыва отклонено — отзыв остался";
   });
   await run("N6", "Новый поставщик", "Водоснабжение и канализация — happy; unhappy: спор → resolved 50%", "happy+unhappy/new", async (st) => {
     const r = await createRequest(nb, nbHouse.id, "eng_water_sewer"); const h = await happyCycle(nb, inUser, r.id, photo, { sellerCompanyId: inz.company!.id }); st.push(...h.steps);
@@ -322,7 +327,7 @@ const wallet = async (companyId: string) => Number((await prisma.wallet.findUniq
     for (const [f, type, why] of [[EXE, "application/octet-stream", "формат"], [BIG, "image/jpeg", "2 МБ"]] as const) { const r = await registerCompany(u, { name: "Плохой файл", legal_type: "ip", role: "supplier", doc: f, docType: type, categories: [] }); assert(!r.company && r.flash, `${why}: должна быть ошибка`); assert(/формат|МБ/i.test(r.flash), `понятная ошибка (${why}): ${r.flash}`); st.push(`${path.basename(f)} → ${r.flash.slice(0, 70)}`); }
     const ok = await registerCompany(u, { name: "Документы ОК", legal_type: "too", role: "supplier", doc: PNG, docType: "image/png", categories: ["walls"] }); assert(ok.company, ok.flash); st.push("PNG → " + ok.flash);
     for (const [f, type] of [[PDF, "application/pdf"], [JPG, "image/jpeg"]] as const) { const r = await uploadVerification(u, "registration", "", f, "2028-12-31", type); assert(!r.error, `${path.basename(f)}: ${r.flash}`); st.push(`${path.basename(f)} → принят`); }
-    const ss = await page("/supplier/settings", u); assert((ss.html.match(/download=/g) ?? []).length >= 2 || /src="data:image/.test(ss.html), "документы отображаются"); const ap = await page("/admin", adm); assert(ap.text.includes("Документы ОК"), "админ видит новую компанию в очереди"); return "валидация форматов и размеров работает";
+    const ss = await page("/supplier/settings", u); assert((ss.html.match(/href="\/f\//g) ?? []).length >= 2 || /src="data:image/.test(ss.html), "документы отображаются"); const ap = await page("/admin", adm); assert(ap.text.includes("Документы ОК"), "админ видит новую компанию в очереди"); return "валидация форматов и размеров работает";
   });
   const nbUser2 = await registerUser("Марат (Новая стройкомпания)", "buyer");
   const nbc = await registerCompany(nbUser2, { name: "СтройХолдинг Тест", legal_type: "too", role: "buyer", doc: PNG, docType: "image/png", categories: [] });
