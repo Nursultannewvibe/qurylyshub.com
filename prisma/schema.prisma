@@ -1294,3 +1294,16 @@ model ActivityLog {
   @@index([entity_type, entity_id])
   @@map("activity_log")
 }
+
+// Файлы в БД (режим UPLOAD_STORAGE=inline): страницы хранят только ссылку /f/<id>, содержимое читается при открытии.
+model FileBlob {
+  id         String   @id @default(cuid())
+  mime       String
+  name       String
+  size       Int
+  data       Bytes
+  owner_id   String?
+  created_at DateTime @default(now())
+
+  @@map("file_blobs")
+}

@@ -14,7 +14,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const type = String(fd.get("type") ?? "document");
   try {
     if (!file) throw new AppError("no_file", "Файл не передан");
-    const url = await saveUpload(file, `projects/${id}`);
+    const url = await saveUpload(file, `projects/${id}`, s.user.id);
     await prisma.projectFile.create({ data: { project_id: id, type: type as never, url, name: file.name, size_bytes: file.size, validated: true } });
     return NextResponse.redirect(new URL(`/projects/${id}?ok=${encodeURIComponent("Файл загружен")}`, req.url), 303);
   } catch (e) {

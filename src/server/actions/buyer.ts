@@ -44,7 +44,7 @@ export async function stageProgressAction(fd: FormData) {
 
 export async function addLabReportAction(fd: FormData) {
   const s = await requireSession(); const pid = str(fd, "project_id");
-  await act(`/projects/${pid}`, async () => { const f = fileFrom(fd, "file"); const url = f ? await saveUpload(f, "lab") : str(fd, "file_url") || undefined; await T.addLabReport(s.user.id, { project_id: pid, lab_name: str(fd, "lab_name"), report_type: str(fd, "report_type") as never, verdict_summary: str(fd, "verdict_summary") || undefined, file_url: url }); return "Лабораторный отчёт добавлен"; });
+  await act(`/projects/${pid}`, async () => { const f = fileFrom(fd, "file"); const url = f ? await saveUpload(f, "lab", s.user.id) : str(fd, "file_url") || undefined; await T.addLabReport(s.user.id, { project_id: pid, lab_name: str(fd, "lab_name"), report_type: str(fd, "report_type") as never, verdict_summary: str(fd, "verdict_summary") || undefined, file_url: url }); return "Лабораторный отчёт добавлен"; });
 }
 
 export async function createRequestAction(fd: FormData) {

@@ -15,7 +15,7 @@ export async function startWorkAction(fd: FormData) { const s = await requireSes
 export async function submitMilestoneAction(fd: FormData) { const s = await requireSession(); const did = str(fd, "deal_id"); await act(`/deals/${did}`, async () => { await E.submitMilestone(s.user.id, str(fd, "milestone_id")); return "Этап сдан на приёмку"; }); }
 export async function checklistAction(fd: FormData) {
   const s = await requireSession(); const did = str(fd, "deal_id");
-  await act(`/deals/${did}`, async () => { const f = fileFrom(fd, "photo"); const url = f ? await saveUpload(f, "checklists") : str(fd, "photo_url") || null; await E.setChecklistResult(s.user.id, str(fd, "milestone_id"), str(fd, "item_id"), bool(fd, "checked"), url); return url ? "Пункт отмечен, фото приложено" : "Пункт чек-листа сохранён"; });
+  await act(`/deals/${did}`, async () => { const f = fileFrom(fd, "photo"); const url = f ? await saveUpload(f, "checklists", s.user.id) : str(fd, "photo_url") || null; await E.setChecklistResult(s.user.id, str(fd, "milestone_id"), str(fd, "item_id"), bool(fd, "checked"), url); return url ? "Пункт отмечен, фото приложено" : "Пункт чек-листа сохранён"; });
 }
 export async function acceptMilestoneAction(fd: FormData) {
   const s = await requireSession(); const did = str(fd, "deal_id");
@@ -42,7 +42,7 @@ export async function warrantyAction(fd: FormData) { const s = await requireSess
 export async function warrantyStatusAction(fd: FormData) { const s = await requireSession(); const did = str(fd, "deal_id"); await act(`/deals/${did}`, async () => { await Dis.updateWarrantyClaim(s.user.id, str(fd, "claim_id"), str(fd, "status") as never); return "Статус претензии обновлён"; }); }
 export async function reviewAction(fd: FormData) {
   const s = await requireSession(); const did = str(fd, "deal_id");
-  await act(`/deals/${did}`, async () => { const f = fileFrom(fd, "photo"); const url = f ? await saveUpload(f, "reviews") : str(fd, "photo_url"); const r = await R.createReview(s.user.id, did, { rating: Number(str(fd, "rating")), text: str(fd, "text") || undefined, photo_urls: url ? [url] : [] }); await R.recalculateReputation(r.target_company_id); return r.verified ? "Спасибо! Отзыв опубликован как верифицированный (по реальной сделке), рейтинг компании обновлён" : "Отзыв сохранён без отметки «верифицирован» — прошло больше окна для отзывов"; });
+  await act(`/deals/${did}`, async () => { const f = fileFrom(fd, "photo"); const url = f ? await saveUpload(f, "reviews", s.user.id) : str(fd, "photo_url"); const r = await R.createReview(s.user.id, did, { rating: Number(str(fd, "rating")), text: str(fd, "text") || undefined, photo_urls: url ? [url] : [] }); await R.recalculateReputation(r.target_company_id); return r.verified ? "Спасибо! Отзыв опубликован как верифицированный (по реальной сделке), рейтинг компании обновлён" : "Отзыв сохранён без отметки «верифицирован» — прошло больше окна для отзывов"; });
 }
 export async function rateAction(fd: FormData) { const s = await requireSession(); const did = str(fd, "deal_id"); await act(`/deals/${did}`, async () => { await R.rateCounterparty(s.user.id, did, Number(str(fd, "rating")), str(fd, "text") || undefined); return "Оценка сохранена"; }); }
 export async function cancelDealAction(fd: FormData) { const s = await requireSession(); const did = str(fd, "deal_id"); await act(`/deals/${did}`, async () => { await E.cancelDeal(s.user.id, did, str(fd, "reason") || "buyer_cancelled"); return "Сделка отменена по cancel_policy"; }); }

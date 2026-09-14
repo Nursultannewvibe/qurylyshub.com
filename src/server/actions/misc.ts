@@ -38,7 +38,7 @@ export async function registerCompanyAction(fd: FormData) {
     if (!bool(fd, "consent")) throw new Error("Требуется согласие на обработку персональных данных");
     const docFile = fileFrom(fd, "registration_doc");
     if (!docFile && !str(fd, "registration_doc_url")) throw new Error("Приложите талон уведомления (ИП) или устав (ТОО)");
-    const docUrl = docFile ? await saveUpload(docFile, "docs") : str(fd, "registration_doc_url");
+    const docUrl = docFile ? await saveUpload(docFile, "docs", s.user.id) : str(fd, "registration_doc_url");
     const c = await prisma.company.create({ data: { legal_type: str(fd, "legal_type") as never, name: str(fd, "name"), bin: str(fd, "bin"), role, scale: (str(fd, "scale") || "small") as never, public_slug: slugify(str(fd, "name")), region: str(fd, "region") || null, city: str(fd, "city") || null, registration_doc_url: docUrl || null, bank_account: str(fd, "bank_account") || null, tax_status: (str(fd, "tax_status") || "non_vat") as never, service_center_lat: num(fd, "lat"), service_center_lng: num(fd, "lng"), service_radius_km: num(fd, "radius") ?? 50, members: { create: { user_id: s.user.id, permission: "owner" } }, reputation: { create: {} }, wallet: role === "buyer" ? undefined : { create: {} }, verifications: { create: { doc_type: "registration", doc_url: docUrl || null } } } });
     await prisma.consent.create({ data: { user_id: s.user.id, consent_type: "personal_data" } });
     const userRole = role === "buyer" ? "buyer" : role;

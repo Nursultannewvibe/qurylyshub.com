@@ -23,6 +23,7 @@ export function A({ href, children, className = "" }: { href: string; children: 
 /** Ссылка на файл: data:-изображения — превью (браузер блокирует переход по data:), прочие data: — скачивание, обычные URL — ссылка. */
 export function FileLink({ url, label = "файл", thumb = true }: { url: string | null | undefined; label?: string; thumb?: boolean }) {
   if (!url) return null;
+  if (url.startsWith("/f/")) return thumb && /\.(png|jpe?g|webp)$/i.test(url) ? <a href={url} target="_blank" rel="noreferrer"><img loading="lazy" src={url} alt={label} className="inline-block h-14 max-w-[120px] rounded border border-slate-200 object-cover align-middle" /></a> : <a href={url} target="_blank" rel="noreferrer" className="text-brand-600">{label} ↗</a>;
   if (url.startsWith("data:image")) return thumb ? <img src={url} alt={label} className="inline-block h-14 max-w-[120px] rounded border border-slate-200 object-cover align-middle" /> : <a href={url} download={label} className="text-brand-600">{label}</a>;
   if (url.startsWith("data:")) { const name = decodeURIComponent(url.match(/;name=([^;,]+)/)?.[1] ?? label); return <a href={url} download={name} className="text-brand-600">{name} ⤓</a>; }
   return <a href={url} target="_blank" rel="noreferrer" className="text-brand-600">{label}</a>;

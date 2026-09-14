@@ -61,7 +61,7 @@ export async function verificationUploadAction(fd: FormData) {
   const s = await requireSession(); const c = companyOf(s);
   await act("/supplier/settings", async () => {
     const f = fileFrom(fd, "doc"); if (!f && !str(fd, "doc_url")) throw new Error("Приложите файл документа");
-    const url = f ? await saveUpload(f, "docs") : str(fd, "doc_url");
+    const url = f ? await saveUpload(f, "docs", s.user.id) : str(fd, "doc_url");
     if (["license", "attestation"].includes(str(fd, "doc_type")) && str(fd, "doc_type") === "license" && !str(fd, "category_id")) throw new Error("Для лицензии укажите категорию, на которую она выдана");
     await prisma.verification.create({ data: { company_id: c.id, category_id: str(fd, "category_id") || null, doc_type: str(fd, "doc_type") as never, doc_url: url || null, valid_until: str(fd, "valid_until") ? new Date(str(fd, "valid_until")) : null } });
     return "Документ отправлен на проверку — администратор подтвердит или отклонит, вы получите уведомление";
