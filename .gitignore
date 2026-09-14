@@ -8,3 +8,5 @@ uploads/*
 .vercel
 .env*
 qa-progress.md
+qa-docs/
+qa-live-result.json
