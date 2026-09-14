@@ -7,7 +7,8 @@ import { Badge, Dt, Flash, FileLink } from "@/components/ui";
 import { reviewResponseAction, reviewDisputeAction } from "@/server/actions/deals";
 
 export default async function CompanyPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
-  const { slug } = await params; const sp = await searchParams;
+  const { slug: rawSlug } = await params; const sp = await searchParams;
+  const slug = decodeURIComponent(rawSlug); // старые кириллические slug приходят percent-encoded
   const c = await companyCard(slug);
   if (!c) notFound();
   const s = await getSession();
