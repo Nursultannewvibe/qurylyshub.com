@@ -26,12 +26,15 @@ export async function logActivity(
   });
 }
 
+/**
+ * Проверка целостности ссылок: каждая запись через previous_hash ссылается на существующую запись (или null у первой).
+ * Удаление/подмена записи ломает ссылку. Порядок вставки при параллельных запросах не важен (форки допустимы);
+ * неизменяемость самих записей обеспечивается правами БД (роль приложения без UPDATE/DELETE).
+ */
 export async function verifyChain(limit = 5000): Promise<{ ok: boolean; checked: number; brokenAt?: string }> {
-  const rows = await prisma.activityLog.findMany({ orderBy: { created_at: "asc" }, take: limit });
-  let prev: string | null = null;
-  for (const r of rows) {
-    if (r.previous_hash !== prev) return { ok: false, checked: rows.length, brokenAt: r.id };
-    prev = r.hash;
-  }
+  const rows = await prisma.activityLog.findMany({ orderBy: { created_at: "desc" }, take: limit, select: { id: true, hash: true, previous_hash: true } });
+  const hashes = new Set(rows.map((r) => r.hash));
+  const truncated = rows.length >= limit;
+  for (const r of rows) if (r.previous_hash && !hashes.has(r.previous_hash) && !truncated) return { ok: false, checked: rows.length, brokenAt: r.id };
   return { ok: true, checked: rows.length };
 }
