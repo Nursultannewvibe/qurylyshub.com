@@ -20,6 +20,13 @@ export function PageHeader({ title, sub, actions }: { title: string; sub?: React
   return <div className="mb-5 flex flex-wrap items-start justify-between gap-3"><div><h1 className="h1">{title}</h1>{sub ? <div className="muted mt-1">{sub}</div> : null}</div><div className="flex gap-2">{actions}</div></div>;
 }
 export function A({ href, children, className = "" }: { href: string; children: React.ReactNode; className?: string }) { return <Link href={href} className={`text-brand-600 hover:underline ${className}`}>{children}</Link>; }
+/** Ссылка на файл: data:-изображения — превью (браузер блокирует переход по data:), прочие data: — скачивание, обычные URL — ссылка. */
+export function FileLink({ url, label = "файл", thumb = true }: { url: string | null | undefined; label?: string; thumb?: boolean }) {
+  if (!url) return null;
+  if (url.startsWith("data:image")) return thumb ? <img src={url} alt={label} className="inline-block h-14 max-w-[120px] rounded border border-slate-200 object-cover align-middle" /> : <a href={url} download={label} className="text-brand-600">{label}</a>;
+  if (url.startsWith("data:")) { const name = decodeURIComponent(url.match(/;name=([^;,]+)/)?.[1] ?? label); return <a href={url} download={name} className="text-brand-600">{name} ⤓</a>; }
+  return <a href={url} target="_blank" rel="noreferrer" className="text-brand-600">{label}</a>;
+}
 export function ConfirmButton({ label, className = "btn-secondary", name, value }: { label: string; className?: string; name?: string; value?: string }) {
   return <button className={className} name={name} value={value} type="submit">{label}</button>;
 }

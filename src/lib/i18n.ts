@@ -47,6 +47,8 @@ export const LABELS: Record<string, string> = {
   house: "частный дом", hangar: "ангар", shop: "магазин", stable: "конюшня", warehouse: "склад", factory: "завод", cafe: "кафе", bathhouse: "баня", fence: "забор", garage: "гараж", premium_residential: "премиум-ЖК", mall: "ТРЦ", apartment_renovation: "ремонт квартиры",
   // каналы и документы
   in_app: "в приложении", push: "push", sms: "SMS", whatsapp: "WhatsApp", email: "e-mail", license: "лицензия", attestation: "аттестат", bin: "БИН", registration: "регистрация",
+  // типы файлов
+  plan: "план", photo: "фото", document: "документ", voice: "голос",
   // категории споров
   quality: "качество", deadline: "сроки", payment: "оплата", lead_refund: "возврат лида", act_unsigned: "акт не подписан", other: "другое",
 };
