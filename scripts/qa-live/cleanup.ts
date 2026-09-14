@@ -4,7 +4,7 @@ import { prisma } from "../../src/server/db";
 (async () => {
   const users = await prisma.user.findMany({ where: { OR: [{ phone: { startsWith: "+77099" } }, { name: { startsWith: "[QA]" } }] }, select: { id: true } });
   const uids = users.map((u) => u.id);
-  const projects = await prisma.project.findMany({ where: { OR: [{ name: { startsWith: "[QA]" } }, { owner_id: { in: uids } }] }, select: { id: true } });
+  const projects = await prisma.project.findMany({ where: { OR: [{ name: { startsWith: "[QA]" } }, { name: { contains: "(прогон)" } }, { name: { in: ["Гараж Конаев", "Дача (для pitch)", "dbg", "Дом Астана", "Ангар холдинга", "Новая квартира", "Новый дом"] } }, { owner_id: { in: uids } }] }, select: { id: true } });
   const pids = projects.map((p) => p.id);
   const companies = await prisma.company.findMany({ where: { OR: [{ name: { startsWith: "[QA]" } }, { members: { some: { user_id: { in: uids } } } }] }, select: { id: true } });
   const cids = companies.map((c) => c.id);

@@ -126,7 +126,7 @@ export async function requestValues(categoryId: string, override: Record<string,
 }
 
 export async function createProject(s: Session, input: Record<string, string>) {
-  const r = await submit("/projects/new", s, (f) => f.inputs.includes("object_type"), { name: `${QA} ${input.name}`, ...input });
+  const r = await submit("/projects/new", s, (f) => f.inputs.includes("object_type"), { ...input, name: `${QA} ${input.name}` });
   assert(!r.error, `создание объекта: ${r.flash}`);
   const id = r.finalUrl.match(/projects\/([a-z0-9]+)/)?.[1]; assert(id, `нет id объекта: ${r.finalUrl}`);
   return { id, flash: r.flash };
