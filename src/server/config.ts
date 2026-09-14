@@ -24,6 +24,7 @@ export const config = {
   // "files" — папка UPLOAD_DIR; "inline" — файлы ≤ uploadInlineMaxMb хранятся как data-URL в БД (демо на serverless-хостинге)
   uploadStorage: str("UPLOAD_STORAGE", "files") as "files" | "inline",
   uploadInlineMaxMb: num("UPLOAD_INLINE_MAX_MB", 2),
+  get uploadEffectiveMaxMb() { return this.uploadStorage === "inline" ? Math.min(this.uploadInlineMaxMb, this.uploadMaxMb) : this.uploadMaxMb; },
   paymentProvider: str("PAYMENT_PROVIDER", "mock"),
   paymentFallbackProvider: str("PAYMENT_FALLBACK_PROVIDER", "mock"),
   paymentWebhookSecret: str("PAYMENT_WEBHOOK_SECRET", "mock-webhook-secret"),
