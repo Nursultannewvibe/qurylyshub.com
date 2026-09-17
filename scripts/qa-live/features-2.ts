@@ -70,5 +70,35 @@ export async function run({ run, aidar, adm, photo, cid }: Ctx) {
     const big = await submit("/catalog/betonservice", aidar, (f) => f.hidden.product_id === p2.id, { qty: "500" }, { noDefaults: true }); assert(!big.error, big.flash); const d2 = await prisma.deal.findUniqueOrThrow({ where: { id: big.finalUrl.match(/deals\/([a-z0-9]+)/)![1] } }); assert.equal(Number(d2.amount), 15_000_000); assert.equal(d2.commission_percent.toString(), "1", "шкала комиссии: 15 млн → 1%");
     return "stock 1: атомарно 1 из 2; цикл created→paid→received→completed без эскроу; отзыв; под заказ: 500 м³, комиссия 1%";
   });
-  void B; void registerCompany; void photo;
+  // ══════════ 4. ЛОГИСТИКА ══════════
+  const { loginSeed, createRequest, createProject, happyCycle, buyLead, sendOffer, createDeal } = await import("./driver");
+  const cargo = await loginSeed("+77010000012"); const cargoC = await cid(cargo);
+  const house = await createProject(aidar, { name: "Дом для доставки (фичи)", object_type: "house", construction_type: "new", region: "almaty", city: "Алматы", address: "ул. QA-Л 7", area: "100", floors: "1" });
+  await run("F4", "Логистика: маршрут вне коридоров → needs_dispatcher; маршрут внутри коридора ТрансКарго → лид → полный цикл", async (st) => {
+    const cat = await page("/catalog?category=logistics"); assert(cat.text.includes("ТрансКарго"), "перевозчик в каталоге по категории «Перевозки»");
+    const out = await createRequest(aidar, house.id, "logistics", { override: { v_load_region: "astana", v_unload_region: "almaty", v_load_point: "Астана, склад", v_unload_point: "Алматы, объект", v_weight_t: "5" } });
+    const r1 = await prisma.request.findUniqueOrThrow({ where: { id: out.id } }); assert.equal(r1.status, "needs_dispatcher", "вне коридоров → диспетчер: " + out.flash); st.push("Астана→Алматы: " + out.flash.slice(0, 70));
+    const logs = await prisma.activityLog.findMany({ where: { entity_id: out.id, action: { startsWith: "match" } } }); assert(logs.some((l) => JSON.stringify(l.meta_json).includes("вне коридора")), "объяснимость: «вне коридора»"); assert(logs.some((l) => l.action === "match.fallback.needs_dispatcher"), "fallback как у обычного матчинга");
+    const inside = await createRequest(aidar, house.id, "logistics", { override: { v_load_region: "kaskelen", v_unload_region: "almaty", v_load_point: "Каскелен, завод", v_unload_point: "Алматы, объект", v_weight_t: "8" } });
+    const lead = await prisma.lead.findFirst({ where: { request_id: inside.id, company_id: cargoC } }); assert(lead, "ТрансКарго получил лид"); st.push("Каскелен→Алматы: " + inside.flash.slice(0, 60));
+    const rp = await page(`/projects/${house.id}/requests/new?category=${(await catByCode("logistics")).id}`, aidar); assert(/Ориентир рынка: .*тг\/км/.test(rp.text), "ориентир цены тг/км на форме"); assert(rp.text.includes("Каскелен") && !/>kaskelen</.test(rp.html), "регионы показаны названиями");
+    const h = await happyCycle(aidar, cargo, inside.id, photo, { sellerCompanyId: cargoC, offer: { scope: "install_only", work: 45000 } }); st.push(...h.steps.slice(0, 3));
+    return "вне коридора → needs_dispatcher (fallback, explainability); внутри → лид → сделка → акт → отзыв";
+  });
+  await run("F5", "Связка материал → доставка: сделка по бетону → «Найти перевозчика» → предзаполненная заявка → request_links → перевозчик получает лид → сделка", async (st) => {
+    const con = await loginSeed("+77010000004"); const conC = await cid(con);
+    const cr = await createRequest(aidar, house.id, "concrete"); await buyLead(con, cr.id); const o = await sendOffer(con, cr.id, { scope: "material_only", material: 30000 }); assert(!o.error, o.flash); const d = await createDeal(aidar, cr.id, conC);
+    const dp = await page(`/deals/${d.id}`, aidar); assert(dp.text.includes("Нужна доставка?") && dp.text.includes("Найти перевозчика"), "кнопка на сделке по материалу"); const href = dp.html.match(/href="([^"]*delivery_for=[^"]*)"/)?.[1]!.replace(/&amp;/g, "&"); assert(href, "ссылка на форму доставки");
+    const form = await page(href!, aidar); assert(form.text.includes("Доставка для сделки по «Бетон")); const load = form.html.match(/name="v_load_point"[^>]*value="([^"]*)"/)?.[1]; const unload = form.html.match(/name="v_unload_point"[^>]*value="([^"]*)"/)?.[1];
+    assert(load?.includes("БетонСервис") && unload?.includes("ул. QA-Л 7"), `предзаполнение: загрузка «${load}», выгрузка «${unload}»`); st.push(`загрузка: ${load}; выгрузка: ${unload}`);
+    const sel = form.html.match(/name="v_load_region"[^>]*>[\s\S]*?<\/select>/)?.[0] ?? ""; assert(/value="boraldai"[^>]*selected|selected[^>]*value="boraldai"/.test(sel) || form.html.includes('value="boraldai" selected'), "регион загрузки = регион БетонСервис (Боралдай)");
+    const sub = await submit(href!, aidar, (f) => f.inputs.includes("v_load_point"), { v_weight_t: "20", v_cargo_type: "бетон/раствор", v_transport_type: "миксер", v_urgency: "завтра" }); assert(!sub.error, sub.flash); const rid = sub.finalUrl.match(/requests\/([a-z0-9]+)/)?.[1]!; st.push(sub.flash.slice(0, 70));
+    const link = await prisma.requestLink.findFirst({ where: { linked_request_id: rid } }); assert(link && link.primary_request_id === cr.id && link.link_type === "delivery", "request_links создан");
+    const req = await prisma.request.findUniqueOrThrow({ where: { id: rid } }); assert.equal(req.status, "published"); assert(await prisma.lead.findFirst({ where: { request_id: rid, company_id: cargoC } }), "ТрансКарго получил лид (Боралдай→Алматы в коридоре)");
+    const dp2 = await page(`/deals/${d.id}`, aidar); assert(dp2.text.includes("Заявки на доставку"), "сделка показывает связанную заявку"); const rq = await page(`/requests/${rid}`, aidar); assert(rq.text.includes("Доставка для заявки «Бетон"), "заявка показывает связь");
+    const cl = await page("/supplier/leads", cargo); assert(cl.html.includes(rid), "заявка видна перевозчику");
+    const h = await happyCycle(aidar, cargo, rid, photo, { sellerCompanyId: cargoC, offer: { scope: "install_only", work: 60000 } }); st.push(...h.steps.slice(0, 2));
+    return "кнопка → предзаполненная форма → request_links → обычный матчинг → сделка с перевозчиком";
+  });
+  void B; void registerCompany;
 }
