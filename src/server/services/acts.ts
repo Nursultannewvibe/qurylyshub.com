@@ -26,7 +26,7 @@ export async function generateAct(dealId: string, milestoneId: string | null, ty
 <style>body{font-family:Georgia,serif;max-width:800px;margin:40px auto;padding:0 24px;color:#111}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:6px}.sig{margin-top:40px;display:flex;gap:40px}.sig div{flex:1;border-top:1px solid #333;padding-top:8px}.note{font-size:12px;color:#666;margin-top:32px}</style>
 <h2>${esc(title)}</h2>
 <p>г. ${esc(deal.request.project.city)}, ${new Date().toLocaleDateString("ru-RU")}</p>
-<p><b>Заказчик:</b> ${esc(buyerName)}<br><b>Исполнитель:</b> ${esc(deal.seller.name)} (БИН ${esc(deal.seller.bin)})<br>
+<p><b>Заказчик:</b> ${esc(buyerName)}<br><b>Исполнитель:</b> ${esc(deal.seller.name)} (${deal.seller.legal_type === "individual_contractor" ? "физлицо-исполнитель" : "БИН " + esc(deal.seller.bin)})<br>
 <b>Объект:</b> ${esc(deal.request.project.name)}, ${esc(deal.request.project.address ?? "")}<br>
 <b>Категория работ:</b> ${esc(deal.request.category.name)}<br>
 <b>Сделка:</b> ${deal.id} на сумму ${fmtKZT(deal.amount)}</p>

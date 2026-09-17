@@ -7,8 +7,14 @@ import { notifyCompany, notify } from "./notifications";
 
 export type CandidateReason = { company_id: string; name: string; included: boolean; reason: string; distance_km?: number; score?: number };
 
-/** Валидная (verified и не просроченная) лицензия компании на категорию. Используется и матчингом, и отправкой КП. */
+/**
+ * Валидная (verified и не просроченная) лицензия компании на категорию. Единственная точка проверки —
+ * используется матчингом, отправкой КП, рассылкой, сравнением и встречными предложениями.
+ * Физлицо-исполнитель (legal_type=individual_contractor) не может иметь лицензию по определению → всегда false.
+ */
 export async function hasValidLicense(companyId: string, categoryId: string, kind: "license" | "attestation" = "license") {
+  const company = await prisma.company.findUnique({ where: { id: companyId }, select: { legal_type: true } });
+  if (company?.legal_type === "individual_contractor") return false;
   const v = await prisma.verification.findFirst({ where: { company_id: companyId, category_id: categoryId, doc_type: kind, status: "verified", OR: [{ valid_until: null }, { valid_until: { gt: new Date() } }] } });
   return !!v;
 }
@@ -51,7 +57,7 @@ export async function matchRequest(requestId: string, opts: { origin?: LeadOrigi
       const hasArea = c.service_center_lat != null || Array.isArray(c.service_area_polygon);
       if (hasArea && !cov.covered) { push(false, `объект вне зоны обслуживания (${cov.distanceKm.toFixed(0)} км, множитель радиуса ${multiplier})`, { distance_km: cov.distanceKm }); continue; }
     }
-    if (category.required_license && !(await hasValidLicense(c.id, category.id))) { push(false, "категория требует лицензию: нет verified/непросроченной"); continue; }
+    if (category.required_license && !(await hasValidLicense(c.id, category.id))) { push(false, c.legal_type === "individual_contractor" ? "категория требует лицензию: физлицо-исполнитель не допускается" : "категория требует лицензию: нет verified/непросроченной"); continue; }
     if (category.required_attestation && !(await hasValidLicense(c.id, category.id, "attestation"))) { push(false, "категория требует аттестат"); continue; }
     const today = await leadsToday(c.id);
     if (today >= c.daily_lead_limit) { push(false, `достигнут daily_lead_limit (${today}/${c.daily_lead_limit})`); continue; }

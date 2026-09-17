@@ -29,6 +29,7 @@ enum LegalType {
   ip
   too
   self_employed
+  individual_contractor // физлицо-исполнитель: без БИН и документов, не допускается к лицензируемым категориям
 }
 enum CompanyRole {
   supplier
@@ -393,7 +394,7 @@ model Company {
   id                   String      @id @default(cuid())
   legal_type           LegalType
   name                 String
-  bin                  String      @unique
+  bin                  String?     @unique
   bank_account         String?
   registration_doc_url String?
   role                 CompanyRole

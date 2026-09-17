@@ -57,8 +57,8 @@ export async function createOffer(companyId: string, userId: string, requestId: 
   const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
   if (company.soft_banned_until && company.soft_banned_until > new Date()) throw forbidden("Компания под soft-ban до ручного разбора");
   if (request.category.required_license && !(await hasValidLicense(companyId, request.category_id))) {
-    await logActivity({ actor_id: userId, entity_type: "offer", entity_id: requestId, action: "blocked.no_license", meta: { company_id: companyId, category: request.category.code } });
-    throw new AppError("license_required", `Категория «${request.category.name}» требует верифицированную лицензию. Отправка КП недоступна.`, 403);
+    await logActivity({ actor_id: userId, entity_type: "offer", entity_id: requestId, action: "blocked.no_license", meta: { company_id: companyId, category: request.category.code, legal_type: company.legal_type } });
+    throw new AppError("license_required", company.legal_type === "individual_contractor" ? `Категория «${request.category.name}» требует лицензию — физлицо-исполнитель не может работать в лицензируемых категориях. Зарегистрируйте ИП/ТОО и загрузите лицензию.` : `Категория «${request.category.name}» требует верифицированную лицензию. Отправка КП недоступна.`, 403);
   }
   if (request.category.required_attestation && !(await hasValidLicense(companyId, request.category_id, "attestation"))) throw new AppError("attestation_required", "Требуется аттестат", 403);
 

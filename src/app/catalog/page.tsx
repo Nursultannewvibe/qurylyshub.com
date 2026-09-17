@@ -13,7 +13,7 @@ export default async function Catalog({ searchParams }: { searchParams: Promise<
       <button className="btn-primary">Найти</button></form>
     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">{list.map((c) => <Link key={c.id} href={`/catalog/${c.public_slug}`} className="card hover:border-brand-500">
       <div className="flex items-start justify-between"><div className="font-semibold">{c.name}</div><div className="text-sm">★ {c.reputation?.avg_rating?.toFixed(1) ?? "0.0"}</div></div>
-      <div className="muted">{c.city ?? c.region} · {c.legal_type.toUpperCase()} · {c.role === "supplier" ? "поставщик" : "подрядчик"}</div>
+      <div className="muted">{c.city ?? c.region} · {c.legal_type === "individual_contractor" ? <span className="badge bg-amber-100 text-amber-900">физлицо-исполнитель</span> : c.legal_type.toUpperCase()} · {c.role === "supplier" ? "поставщик" : "подрядчик"}</div>
       <div className="mt-2 flex flex-wrap gap-1">{c.category_names.map((n) => <span key={n} className="badge bg-slate-100 text-slate-700">{n}</span>)}</div>
       <div className="mt-2 text-xs text-slate-500">Сделок: {c.reputation?.deals_count ?? 0} · В срок: {c.reputation?.on_time_pct ?? 100}% · Верификаций: {c.verifications.length}{c.soft_banned_until && c.soft_banned_until > new Date() ? " · ⚠ soft-ban" : ""}</div>
     </Link>)}{!list.length && <p className="muted">Ничего не найдено</p>}</div>

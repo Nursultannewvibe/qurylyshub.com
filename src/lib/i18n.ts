@@ -46,6 +46,7 @@ export const LABELS: Record<string, string> = {
   // типы объектов (дублируют справочник object_types на случай отсутствия)
   house: "частный дом", hangar: "ангар", shop: "магазин", stable: "конюшня", warehouse: "склад", factory: "завод", cafe: "кафе", bathhouse: "баня", fence: "забор", garage: "гараж", premium_residential: "премиум-ЖК", mall: "ТРЦ", apartment_renovation: "ремонт квартиры",
   // каналы и документы
+  individual_contractor: "физлицо-исполнитель", ip: "ИП", too: "ТОО", self_employed: "самозанятый",
   in_app: "в приложении", push: "push", sms: "SMS", whatsapp: "WhatsApp", email: "e-mail", license: "лицензия", attestation: "аттестат", bin: "БИН", registration: "регистрация",
   // типы файлов
   plan: "план", photo: "фото", document: "документ", voice: "голос",

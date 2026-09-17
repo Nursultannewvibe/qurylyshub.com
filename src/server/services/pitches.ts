@@ -4,6 +4,7 @@ import { logActivity } from "../activity";
 import { notify, notifyCompany } from "./notifications";
 import { config } from "../config";
 import { createRequest } from "./requests";
+import { hasValidLicense } from "./matching";
 
 /** 4. Карта объектов для поставщика — только объекты в рамках его категорий, без адреса и контактов. */
 export async function mapProjectsForCompany(companyId: string) {
@@ -32,6 +33,7 @@ export async function createPitch(companyId: string, userId: string, input: { pr
   const category = await prisma.category.findUniqueOrThrow({ where: { id: input.category_id } });
   if (!((company.categories_json as string[]) ?? []).includes(category.id)) throw forbidden(`Категория «${category.name}» вне scope компании`);
   if (!(category.object_types_json as string[]).includes(project.object_type)) throw bad("scope_object", "Категория не применима к типу объекта");
+  if (category.required_license && !(await hasValidLicense(companyId, category.id))) throw forbidden(company.legal_type === "individual_contractor" ? `Категория «${category.name}» требует лицензию — физлицо-исполнитель не допускается` : `Категория «${category.name}» требует верифицированную лицензию`);
   const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
   const today = await prisma.supplierPitch.count({ where: { company_id: companyId, created_at: { gte: dayStart } } });
   if (today >= company.pitch_daily_limit) throw conflict("pitch_daily_limit", `Дневной лимит встречных предложений исчерпан (${company.pitch_daily_limit})`);

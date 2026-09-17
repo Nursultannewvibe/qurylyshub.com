@@ -10,3 +10,4 @@ uploads/*
 qa-progress.md
 qa-docs/
 qa-live-result.json
+qa-features-result.json
