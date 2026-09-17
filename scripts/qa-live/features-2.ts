@@ -41,5 +41,34 @@ export async function run({ run, aidar, adm, photo, cid }: Ctx) {
     const n = await prisma.notification.findFirst({ where: { user_id: adm.userId, type: "board.report" } }); assert(n, "админ уведомлён о жалобе");
     return "чтение публично; пост/ответ после входа; лимиты пользователя и компании; жалобы решены (удалено/оставлено)";
   });
-  void B; void registerUser; void registerCompany; void catByCode; void photo;
+  // ══════════ 3. КАТАЛОГ ТОВАРОВ ══════════
+  await run("F3", "Товар: покупка со stock_qty → сделка product_purchase → оплата → получено → завершено → отзыв; параллельная покупка последней единицы; товар под заказ", async (st) => {
+    const con = await (await import("./driver")).loginSeed("+77010000004"); const conC = await cid(con);
+    const concrete = await catByCode("concrete");
+    const add = await submit("/supplier/products", con, (f) => f.inputs.includes("name") && f.inputs.includes("price"), { category_id: concrete.id, name: "[QA] Бетон М300 (последний куб)", description: "QA", unit: "м³", price: "34000", min_order_qty: "1", stock_qty: "1" }, { noDefaults: true }); assert(!add.error, add.flash); st.push(add.flash);
+    const prod = await prisma.product.findFirstOrThrow({ where: { company_id: conC, name: { startsWith: "[QA] Бетон М300" } } });
+    const card = await page("/catalog/betonservice", aidar); assert(card.text.includes("[QA] Бетон М300") && card.text.includes("Купить"), "товар с кнопкой «Купить» в карточке");
+    // две параллельные покупки последней единицы — проходит одна
+    const buyer2 = await registerUser("Покупатель 2", "buyer");
+    const [r1, r2] = await Promise.all([aidar, buyer2].map((u) => submit("/catalog/betonservice", u, (f) => f.hidden.product_id === prod.id, { qty: "1" }, { noDefaults: true })));
+    const okOnes = [r1, r2].filter((r) => !r.error); const failed = [r1, r2].filter((r) => r.error);
+    assert.equal(okOnes.length, 1, `должна пройти ровно одна покупка: ${r1.flash} | ${r2.flash}`); assert(/закончился|только/.test(failed[0].flash), "вторая — понятный отказ: " + failed[0].flash); st.push("параллельно: 1 успех, отказ «" + failed[0].flash.slice(0, 40) + "»");
+    assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: prod.id } })).stock_qty, 0, "остаток 0");
+    const winner = okOnes[0] === r1 ? aidar : buyer2; const did = okOnes[0].finalUrl.match(/deals\/([a-z0-9]+)/)?.[1]!;
+    const deal = await prisma.deal.findUniqueOrThrow({ where: { id: did }, include: { milestones: true, escrow_holds: true, acts: true } }); assert.equal(deal.deal_type, "product_purchase"); assert.equal(Number(deal.amount), 34000); assert.equal(deal.commission_percent.toString(), "5"); assert.equal(deal.milestones.length + deal.escrow_holds.length + deal.acts.length, 0, "без milestones/escrow/acts");
+    const pay = await submit(`/deals/${did}`, winner, (f) => f.buttons.some((b) => /Оплатить/.test(b.label)), {}); assert(!pay.error && /succeeded/.test(pay.flash), pay.flash);
+    const pay2 = await page(`/deals/${did}`, winner); assert(!pay2.text.includes("Оплатить"), "повторной кнопки оплаты нет"); assert(pay2.text.includes("Товар получен"), "кнопка «Товар получен»");
+    const sv = await page(`/deals/${did}`, con); assert(sv.text.includes("Оплачено. Отгрузите"), "продавец видит «оплачено, отгружайте»");
+    const before = Number((await prisma.wallet.findUniqueOrThrow({ where: { company_id: conC } })).balance);
+    const rc = await submit(`/deals/${did}`, winner, (f) => f.buttons.some((b) => b.label === "Товар получен"), {}); assert(!rc.error, rc.flash); st.push(rc.flash.slice(0, 60));
+    assert.equal((await prisma.deal.findUniqueOrThrow({ where: { id: did } })).status, "completed"); assert.equal(Number((await prisma.wallet.findUniqueOrThrow({ where: { company_id: conC } })).balance), before + 32300, "продавцу 34000 − 5%");
+    const rv = await submit(`/deals/${did}`, winner, (f) => f.inputs.includes("rating"), { rating: "5", text: "QA товар отличный" }); assert(!rv.error && /верифицированный/.test(rv.flash), rv.flash); st.push("отзыв verified");
+    // товар под заказ: stock_qty=null — любое количество
+    const add2 = await submit("/supplier/products", con, (f) => f.inputs.includes("name") && f.inputs.includes("price"), { category_id: concrete.id, name: "[QA] Бетон под заказ", unit: "м³", price: "30000", min_order_qty: "5", stock_qty: "" }, { noDefaults: true }); assert(!add2.error, add2.flash);
+    const p2 = await prisma.product.findFirstOrThrow({ where: { name: "[QA] Бетон под заказ" } }); assert.equal(p2.stock_qty, null);
+    const low = await submit("/catalog/betonservice", aidar, (f) => f.hidden.product_id === p2.id, { qty: "2" }, { noDefaults: true }); assert(low.error && /Минимальный заказ/.test(low.flash), "мин. заказ: " + low.flash);
+    const big = await submit("/catalog/betonservice", aidar, (f) => f.hidden.product_id === p2.id, { qty: "500" }, { noDefaults: true }); assert(!big.error, big.flash); const d2 = await prisma.deal.findUniqueOrThrow({ where: { id: big.finalUrl.match(/deals\/([a-z0-9]+)/)![1] } }); assert.equal(Number(d2.amount), 15_000_000); assert.equal(d2.commission_percent.toString(), "1", "шкала комиссии: 15 млн → 1%");
+    return "stock 1: атомарно 1 из 2; цикл created→paid→received→completed без эскроу; отзыв; под заказ: 500 м³, комиссия 1%";
+  });
+  void B; void registerCompany; void photo;
 }
