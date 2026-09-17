@@ -26,6 +26,9 @@ import { prisma } from "../../src/server/db";
   await prisma.phoneChangeLog.deleteMany({ where: { user_id: { in: uids } } });
   await prisma.otpAttempt.deleteMany({ where: { phone: { startsWith: "+77099" } } });
   await prisma.otpCode.deleteMany({ where: { phone: { startsWith: "+77099" } } });
+  await prisma.boardPost.deleteMany({ where: { OR: [{ title: { startsWith: "[QA]" } }, { author_id: { in: uids } }] } });
+  await prisma.boardReport.deleteMany({ where: { reason: { startsWith: "QA" } } });
+  await prisma.company.updateMany({ where: { board_post_daily_limit: { lt: 5 } }, data: { board_post_daily_limit: 5 } });
   await prisma.fileBlob.deleteMany({ where: { owner_id: { in: uids } } });
   const r5 = await prisma.user.deleteMany({ where: { id: { in: uids } } });
   await prisma.company.updateMany({ where: { soft_ban_reason: { startsWith: "auto:" } }, data: { soft_banned_until: null, soft_ban_reason: null } }); // авто-баны из QA-споров
