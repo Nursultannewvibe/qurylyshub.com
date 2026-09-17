@@ -18,6 +18,7 @@ export const config = {
   actSignDeadlineDays: int("ACT_SIGN_DEADLINE_DAYS", 5),
   reviewWindowDays: int("REVIEW_WINDOW_DAYS", 30),
   pitchExpiresDays: int("PITCH_EXPIRES_DAYS", 7),
+  boardPostDailyLimit: int("BOARD_POST_DAILY_LIMIT", 5),
   aiParseDailyLimit: int("AI_PARSE_DAILY_LIMIT", 10),
   uploadDir: str("UPLOAD_DIR", "./uploads"),
   uploadMaxMb: int("UPLOAD_MAX_MB", 15),

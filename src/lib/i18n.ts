@@ -46,7 +46,7 @@ export const LABELS: Record<string, string> = {
   // типы объектов (дублируют справочник object_types на случай отсутствия)
   house: "частный дом", hangar: "ангар", shop: "магазин", stable: "конюшня", warehouse: "склад", factory: "завод", cafe: "кафе", bathhouse: "баня", fence: "забор", garage: "гараж", premium_residential: "премиум-ЖК", mall: "ТРЦ", apartment_renovation: "ремонт квартиры",
   // каналы и документы
-  individual_contractor: "физлицо-исполнитель", ip: "ИП", too: "ТОО", self_employed: "самозанятый",
+  individual_contractor: "физлицо-исполнитель", post: "ветка", reply: "ответ", ip: "ИП", too: "ТОО", self_employed: "самозанятый",
   in_app: "в приложении", push: "push", sms: "SMS", whatsapp: "WhatsApp", email: "e-mail", license: "лицензия", attestation: "аттестат", bin: "БИН", registration: "регистрация",
   // типы файлов
   plan: "план", photo: "фото", document: "документ", voice: "голос",
@@ -84,7 +84,8 @@ export function describeNotification(type: string, p: Record<string, unknown>): 
     "request.needs_dispatcher": [`Заявка «${s("category")}» (${s("city")}) без кандидатов — назначьте поставщика`, "/admin"],
     "verification.verified": ["Документ верифицирован", "/supplier/settings"], "verification.rejected": ["Документ отклонён", "/supplier/settings"], "verification.expiring": ["Срок лицензии истекает — обновите документ", "/supplier/settings"],
     "payout.approved": ["Вывод средств одобрен", "/supplier/wallet"], "payout.completed": ["Вывод средств выполнен", "/supplier/wallet"], "payout.rejected": ["Вывод средств отклонён — деньги возвращены на баланс", "/supplier/wallet"],
-    "deal.cancelled": ["Сделка отменена", "/deals"], "lead.dispute": ["Запрос на возврат лида", "/admin"], "review.dispute": ["Оспаривание отзыва", "/admin"],
+    "deal.cancelled": ["Сделка отменена", "/deals"],
+    "board.reply": [`Новый ответ в вашей ветке «${s("title")}»`, `/board/post/${s("post_id")}`], "board.report": ["Жалоба на сообщение на доске обсуждений", "/admin"], "lead.dispute": ["Запрос на возврат лида", "/admin"], "review.dispute": ["Оспаривание отзыва", "/admin"],
   };
   const m = map[type];
   return m ? { title: m[0], href: m[1] } : { title: type, href: null };

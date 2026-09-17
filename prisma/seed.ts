@@ -129,6 +129,11 @@ async function main() {
   const cafe = await createProject(uBig.id, { name: "Кафе в Талгаре", object_type: "cafe", construction_type: "new", region: "talgar", city: "Талгар", address: "пр. Абая, 88", geo_lat: 43.3, geo_lng: 77.23, area: 250, floors: 1, company_id: cBig.id, open_to_pitches: true });
   await prisma.projectMember.createMany({ data: [korpusA, korpusB, warehouse, cafe, zhk].map((p) => ({ project_id: p.project.id, user_id: uBig.id, permission: "owner" as const })), skipDuplicates: true });
 
+  // Доска обсуждений — пример публичной ветки (Бетон / Каскелен) с ответом верифицированной компании
+  const kaskelen = await prisma.region.findUniqueOrThrow({ where: { code: "kaskelen" } });
+  const bp = await prisma.boardPost.create({ data: { category_id: cat.concrete, region_id: kaskelen.id, author_id: uBuyer.id, title: "Сколько реально стоит фундамент под дом 120 м²?", body: "Строю одноэтажный дом, площадь 120 м², грунт обычный. Сколько в среднем берут за заливку ленты под ключ?" } });
+  await prisma.boardReply.create({ data: { post_id: bp.id, author_id: uCon.id, body: "Зависит от глубины и марки бетона, но в среднем 25–30 тыс тг за м² ленты с работой. Могу прикинуть точнее, если пришлёте план." } });
+
   console.log("✓ seed готов");
   console.table(Object.values(A).map((a) => ({ телефон: a.phone, кто: a.name, otp: process.env.DEV_OTP_CODE ?? "(см. лог сервера)" })));
   void [house2, uAdmin, uTiler, cTiler, cCon];

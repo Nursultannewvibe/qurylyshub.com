@@ -309,6 +309,8 @@ model User {
   reviews               Review[]
   ratings               Rating[]
   ai_parses             AiParse[]
+  board_posts           BoardPost[]
+  board_replies         BoardReply[]
 
   @@map("users")
 }
@@ -416,6 +418,7 @@ model Company {
   daily_lead_limit     Int         @default(5)
   pitch_daily_limit    Int         @default(5)
   pitch_cooldown_days  Int         @default(7)
+  board_post_daily_limit Int       @default(5)
   soft_banned_until    DateTime?
   soft_ban_reason      String?
   created_at           DateTime    @default(now())
@@ -438,6 +441,7 @@ model Company {
   request_batches   RequestBatch[]
   deals_as_seller   Deal[]           @relation("seller")
   deals_as_buyer    Deal[]           @relation("buyer")
+  board_posts       BoardPost[]
 
   @@map("companies")
 }
@@ -504,6 +508,7 @@ model Region {
   parent_id String?
   lat       Float?
   lng       Float?
+  board_posts BoardPost[]
 
   @@map("regions")
 }
@@ -553,6 +558,7 @@ model Category {
   checklists      AcceptanceChecklist[]
   price_refs      PriceReference[]
   batches         RequestBatch[]
+  board_posts     BoardPost[]
 
   @@map("categories")
 }
@@ -1307,4 +1313,58 @@ model FileBlob {
   created_at DateTime @default(now())
 
   @@map("file_blobs")
+}
+
+// ───────────────────────── ДОСКА ОБСУЖДЕНИЙ (только публичные ветки по категории/региону) ─────────────────────────
+enum BoardTargetType {
+  post
+  reply
+}
+enum BoardReportStatus {
+  open
+  resolved
+  rejected
+}
+model BoardPost {
+  id          String   @id @default(cuid())
+  category_id String
+  region_id   String?
+  author_id   String
+  company_id  String?
+  title       String
+  body        String
+  created_at  DateTime @default(now())
+  category Category @relation(fields: [category_id], references: [id])
+  region   Region?  @relation(fields: [region_id], references: [id])
+  author   User     @relation(fields: [author_id], references: [id], onDelete: Cascade)
+  company  Company? @relation(fields: [company_id], references: [id], onDelete: SetNull)
+  replies  BoardReply[]
+
+  @@index([category_id, region_id, created_at])
+  @@map("board_posts")
+}
+model BoardReply {
+  id         String   @id @default(cuid())
+  post_id    String
+  author_id  String
+  body       String
+  created_at DateTime @default(now())
+  post   BoardPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  author User      @relation(fields: [author_id], references: [id], onDelete: Cascade)
+
+  @@map("board_replies")
+}
+model BoardReport {
+  id          String            @id @default(cuid())
+  target_type BoardTargetType
+  target_id   String
+  reported_by String
+  reason      String
+  status      BoardReportStatus @default(open)
+  resolution  String?
+  created_at  DateTime          @default(now())
+  resolved_at DateTime?
+
+  @@index([status])
+  @@map("board_reports")
 }

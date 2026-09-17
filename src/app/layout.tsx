@@ -17,7 +17,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const roles = session?.user.roles ?? [];
   const isSupplier = roles.includes("supplier") || roles.includes("contractor");
   const isBuyer = roles.includes("buyer");
-  const nav: { href: string; label: string }[] = [{ href: "/catalog", label: t(locale, "catalog") }];
+  const nav: { href: string; label: string }[] = [{ href: "/catalog", label: t(locale, "catalog") }, { href: "/board", label: locale === "kk" ? "Талқылау" : "Обсуждения" }];
   if (session) {
     nav.push({ href: "/dashboard", label: t(locale, "dashboard") });
     if (isBuyer) nav.push({ href: "/projects", label: t(locale, "projects") }, { href: "/inbox", label: t(locale, "inbox") }, { href: "/outbox", label: t(locale, "outbox") });
