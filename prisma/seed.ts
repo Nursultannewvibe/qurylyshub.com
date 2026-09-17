@@ -5,6 +5,7 @@ import { prisma } from "../src/server/db";
 import { regions, objectTypes, categories, stageTypicalDurations, commissionTiers, checklists, regulatoryRules, priceReference } from "./seed-data/reference";
 import { templates } from "./seed-data/templates";
 import { createProject } from "../src/server/services/projects";
+import { upsertLogistics } from "./seed-data/logistics";
 
 const owner = new PrismaClient({ datasourceUrl: process.env.DATABASE_MIGRATE_URL });
 const D = (v: number) => new Prisma.Decimal(v);
@@ -22,6 +23,7 @@ export const TEST_ACCOUNTS = {
   concrete: { phone: "+77010000004", name: "БетонСервис (поставщик)" },
   roofer: { phone: "+77010000005", name: "КровляМастер (подрядчик)" },
   supervisor: { phone: "+77010000006", name: "Марат (технадзор)" },
+  carrier: { phone: "+77010000012", name: "ТрансКарго (перевозчик)" },
   admin: { phone: "+77010000007", name: "Админ / диспетчер" },
   renoContractor: { phone: "+77010000008", name: "РемСтрой (подрядчик по ремонту)" },
   unlicensed: { phone: "+77010000009", name: "ЭлектроМонтаж (без лицензии)" },
@@ -129,6 +131,7 @@ async function main() {
   const cafe = await createProject(uBig.id, { name: "Кафе в Талгаре", object_type: "cafe", construction_type: "new", region: "talgar", city: "Талгар", address: "пр. Абая, 88", geo_lat: 43.3, geo_lng: 77.23, area: 250, floors: 1, company_id: cBig.id, open_to_pitches: true });
   await prisma.projectMember.createMany({ data: [korpusA, korpusB, warehouse, cafe, zhk].map((p) => ({ project_id: p.project.id, user_id: uBig.id, permission: "owner" as const })), skipDuplicates: true });
 
+  await upsertLogistics(prisma);
   // Доска обсуждений — пример публичной ветки (Бетон / Каскелен) с ответом верифицированной компании
   const kaskelen = await prisma.region.findUniqueOrThrow({ where: { code: "kaskelen" } });
   const bp = await prisma.boardPost.create({ data: { category_id: cat.concrete, region_id: kaskelen.id, author_id: uBuyer.id, title: "Сколько реально стоит фундамент под дом 120 м²?", body: "Строю одноэтажный дом, площадь 120 м², грунт обычный. Сколько в среднем берут за заливку ленты под ключ?" } });

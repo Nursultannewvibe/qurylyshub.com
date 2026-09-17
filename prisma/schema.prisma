@@ -130,6 +130,14 @@ enum DealStatus {
   completed
   cancelled
 }
+enum CategoryType {
+  material
+  work
+  logistics
+}
+enum RequestLinkType {
+  delivery
+}
 enum DealType {
   service_request  // заявка → КП → эскроу по этапам → акты
   product_purchase // прямая покупка товара: created → paid → received → completed
@@ -417,6 +425,7 @@ model Company {
   service_center_lat   Float?
   service_center_lng   Float?
   service_radius_km    Float?
+  service_route_json   Json        @default("[]") // коридор перевозчика: [["almaty","kaskelen"], ...] — пары регионов (в обе стороны)
   categories_json      Json        @default("[]") // string[] category ids
   rating               Float       @default(0)
   portfolio_json       Json        @default("[]")
@@ -557,6 +566,7 @@ model Category {
   required_license          Boolean  @default(false)
   required_attestation      Boolean  @default(false)
   seasonal_restrictions_json Json?   // {months:[11,12,1,2], message:"..."}
+  category_type             CategoryType @default(work)
   order_index               Int      @default(0)
 
   templates       RequestTemplate[]
@@ -806,6 +816,8 @@ model Request {
   threads  Thread[]
   deals    Deal[]
   batch_items RequestBatchItem[]
+  links_as_primary RequestLink[] @relation("primary")
+  links_as_linked  RequestLink[] @relation("linked")
 
   @@index([status])
   @@map("requests")
@@ -1403,4 +1415,18 @@ model Product {
 
   @@index([company_id, is_active])
   @@map("products")
+}
+
+// Связанные заявки (как deal_items связывает части одной покупки): материал → его доставка
+model RequestLink {
+  id                 String          @id @default(cuid())
+  primary_request_id String
+  linked_request_id  String
+  link_type          RequestLinkType @default(delivery)
+  created_at         DateTime        @default(now())
+  primary Request @relation("primary", fields: [primary_request_id], references: [id], onDelete: Cascade)
+  linked  Request @relation("linked", fields: [linked_request_id], references: [id], onDelete: Cascade)
+
+  @@unique([primary_request_id, linked_request_id])
+  @@map("request_links")
 }

@@ -51,7 +51,12 @@ export async function matchRequest(requestId: string, opts: { origin?: LeadOrigi
     if (already.has(c.id)) { push(false, "уже получал лид по этой заявке (или отказался)"); continue; }
     if (c.soft_banned_until && c.soft_banned_until > now) { push(false, `soft-ban до ${c.soft_banned_until.toISOString()}`); continue; }
     let distance = 0;
-    if (point) {
+    if (category.category_type === "logistics") {
+      // ЛОГИСТИКА: вместо пересечения зоны с точкой объекта — обе точки заявки внутри коридора перевозчика (пара регионов, в любую сторону)
+      const v = request.values_json as Record<string, unknown>; const from = String(v.load_region ?? ""), to = String(v.unload_region ?? "");
+      const routes = (c.service_route_json as string[][]) ?? [];
+      if (!routes.some(([a, b]) => (a === from && b === to) || (a === to && b === from))) { push(false, `маршрут ${from} → ${to} вне коридора перевозчика`); continue; }
+    } else if (point) {
       const cov = coversPoint({ polygon: c.service_area_polygon as number[][] | null, centerLat: c.service_center_lat, centerLng: c.service_center_lng, radiusKm: c.service_radius_km }, point, multiplier);
       distance = cov.distanceKm;
       const hasArea = c.service_center_lat != null || Array.isArray(c.service_area_polygon);
