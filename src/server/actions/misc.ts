@@ -62,6 +62,7 @@ export async function adminAction(fd: FormData) {
     if (a === "dispute_review") { await A.dispatcherAssignLead; const { setDisputeInReview } = await import("../services/disputes"); await setDisputeInReview(s.user.id, str(fd, "dispute_id")); return "Спор взят на рассмотрение"; }
     if (a === "review_dispute") { await R.resolveReviewDispute(s.user.id, str(fd, "review_dispute_id"), str(fd, "outcome") as never, bool(fd, "hide")); return "Оспаривание отзыва решено"; }
     if (a === "refund_lead") { await L.refundLead(str(fd, "lead_id"), "dispute_resolved_by_admin", s.user.id); return "Лид возвращён"; }
+    if (a === "board_report") { const { resolveReport } = await import("../services/board"); await resolveReport(s.user.id, str(fd, "report_id"), str(fd, "outcome") as never, str(fd, "resolution") || undefined); return "Жалоба рассмотрена"; }
     if (a === "job") { const r = await JOBS[str(fd, "job")].run(); return `Джоб ${str(fd, "job")}: ${JSON.stringify(r)}`; }
     if (a === "block_user") { await prisma.user.update({ where: { id: str(fd, "user_id") }, data: { status: str(fd, "status") as never } }); return "Статус пользователя изменён"; }
   });
