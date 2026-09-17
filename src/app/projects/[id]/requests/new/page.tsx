@@ -7,7 +7,7 @@ import { createRequestAction, aiParseAction } from "@/server/actions/buyer";
 import { Calculators } from "./calculators";
 import { config } from "@/server/config";
 
-export default async function NewRequest({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ category?: string; target?: string; ai?: string; error?: string; ok?: string }> }) {
+export default async function NewRequest({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ category?: string; target?: string; ai?: string; delivery_for?: string; error?: string; ok?: string }> }) {
   const { id } = await params; const sp = await searchParams; const s = await requireSession();
   const p = await assertProjectAccess(id, s.user.id);
   const cats = (await prisma.category.findMany({ orderBy: { order_index: "asc" } })).filter((c) => (c.object_types_json as string[]).includes(p.object_type));
@@ -19,6 +19,11 @@ export default async function NewRequest({ params, searchParams }: { params: Pro
   const tpl = await currentTemplate(category.id);
   const ai = sp.ai ? await prisma.aiParse.findUnique({ where: { id: sp.ai } }) : null;
   const pre = ((ai?.result_json as { values?: Record<string, unknown> } | null)?.values ?? {}) as Record<string, unknown>;
+  // СВЯЗКА «материал → доставка»: предзаполнение точек из сделки по материалу (редактируемые)
+  const deliveryDeal = sp.delivery_for ? await prisma.deal.findUnique({ where: { id: sp.delivery_for }, include: { seller: true, request: { include: { category: true } } } }) : null;
+  if (deliveryDeal && category.category_type === "logistics") { pre.load_region = deliveryDeal.seller.region ?? ""; pre.load_point = `${deliveryDeal.seller.name}, ${deliveryDeal.seller.city ?? ""}`; pre.unload_region = p.region; pre.unload_point = `${p.name}, ${p.address ?? p.city}`; pre.cargo_type = /бетон/i.test(deliveryDeal.request?.category.name ?? "") ? "бетон/раствор" : /окн/i.test(deliveryDeal.request?.category.name ?? "") ? "окна/двери (хрупкое)" : "блоки/кирпич (паллеты)"; }
+  const regionsAll = await prisma.region.findMany({ orderBy: { name: "asc" } }); const regionName = (code: string) => regionsAll.find((r) => r.code === code)?.name ?? code;
+  const priceRefs = await prisma.priceReference.findMany({ where: { category_id: category.id, OR: [{ region: p.region }, { region: "almaty" }] } });
   const stages = await prisma.constructionStage.findMany({ where: { project_id: id }, orderBy: { order_index: "asc" } });
   const sr = category.seasonal_restrictions_json as { months?: number[]; message?: string } | null;
   const seasonal = sr?.months?.includes(new Date().getMonth() + 1) ? sr.message : null;
@@ -26,16 +31,18 @@ export default async function NewRequest({ params, searchParams }: { params: Pro
   return <div className="mx-auto max-w-4xl"><h1 className="h1 mb-1">Заявка: {category.name} <span className="muted">шаблон v{tpl.version}</span></h1><p className="muted mb-4">Объект «{p.name}»{target ? <> · точечный запрос → <b>{target.name}</b></> : " · матчинг по всем подходящим поставщикам"}</p><Flash sp={sp} />
     {!target && <div className="mb-3 flex flex-wrap gap-1">{available.map((c) => <a key={c.id} href={`${base}?category=${c.id}`} className={`badge ${c.id === category.id ? "bg-brand-600 text-white" : "bg-slate-100"}`}>{c.name}</a>)}</div>}
     {seasonal && <p className="mb-3 rounded bg-amber-50 p-2 text-sm text-amber-800">⚠ {seasonal}</p>}
+    {deliveryDeal && <p className="mb-3 rounded bg-brand-50 p-2 text-sm">Доставка для сделки по «{deliveryDeal.request?.category.name}» с {deliveryDeal.seller.name}: точки загрузки/выгрузки заполнены — проверьте и при необходимости поправьте. Заявка пройдёт обычный подбор перевозчиков.</p>}
+    {priceRefs.length > 0 && <p className="mb-3 text-sm text-slate-600">Ориентир рынка: {priceRefs.map((r) => `${Number(r.price_min).toLocaleString("ru-RU")}–${Number(r.price_max).toLocaleString("ru-RU")} ${r.unit}`).join("; ")}</p>}
     <details className="card mb-4" open={!!sp.ai}><summary className="cursor-pointer font-semibold">🤖 AI-разбор: опишите задачу текстом / расшифровкой голосового / описанием плана</summary>
       <form action={aiParseAction} className="mt-2 space-y-2"><input type="hidden" name="project_id" value={id} /><input type="hidden" name="category_id" value={category.id} />{target && <input type="hidden" name="target_company_id" value={target.id} />}
         <textarea className="input" name="text" rows={3} placeholder="Например: нужен ленточный фундамент 12×8, высота 1.2, ширина 0.5, бетон М300, с насосом" required /><div className="flex items-center gap-2"><select className="input w-40" name="input_kind"><option value="text">текст</option><option value="voice">голос (расшифровка)</option><option value="plan">план</option><option value="photo">фото (описание)</option></select><button className="btn-secondary">Разобрать</button><span className="text-xs text-slate-400">Адрес, ФИО и телефон в LLM не передаются; лимит {config.aiParseDailyLimit} разборов в день.</span></div></form>
       {ai && <p className="mt-2 text-xs text-slate-500">Предзаполнено из разбора ({ai.provider}); проверьте и подтвердите. Уверенность: {String((ai.result_json as { confidence?: number })?.confidence ?? "—")}</p>}</details>
     <Calculators category={category.code} />
-    <form action={createRequestAction} className="card grid gap-3 sm:grid-cols-2"><input type="hidden" name="project_id" value={id} /><input type="hidden" name="category_id" value={category.id} />{target && <><input type="hidden" name="target_company_id" value={target.id} /><input type="hidden" name="mode" value="direct" /></>}{ai && <input type="hidden" name="ai_parse_id" value={ai.id} />}
+    <form action={createRequestAction} className="card grid gap-3 sm:grid-cols-2"><input type="hidden" name="project_id" value={id} /><input type="hidden" name="category_id" value={category.id} />{deliveryDeal && <input type="hidden" name="delivery_for" value={deliveryDeal.id} />}{target && <><input type="hidden" name="target_company_id" value={target.id} /><input type="hidden" name="mode" value="direct" /></>}{ai && <input type="hidden" name="ai_parse_id" value={ai.id} />}
       <Field label="Этап объекта (для проверки зависимостей)"><select className="input" name="stage_id"><option value="">—</option>{stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}</select></Field>
       {tpl.parameters.map((f) => { const v = pre[f.key]; const n = `v_${f.key}`; const label = `${f.label}${f.unit ? ", " + f.unit : ""}${f.required ? " *" : ""}`;
         if (f.field_type === "boolean") return <label key={f.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name={n} defaultChecked={!!v} /> {f.label}</label>;
-        if (f.field_type === "select") return <Field key={f.id} label={label} hint={f.hint}><select className="input" name={n} defaultValue={v ? String(v) : ""} required={f.required}><option value="">—</option>{(f.options_json as string[]).map((o) => <option key={o}>{o}</option>)}</select></Field>;
+        if (f.field_type === "select") return <Field key={f.id} label={label} hint={f.hint}><select className="input" name={n} defaultValue={v ? String(v) : ""} required={f.required}><option value="">—</option>{(f.options_json as string[]).map((o) => <option key={o} value={o}>{f.key.endsWith("_region") ? regionName(o) : o}</option>)}</select></Field>;
         if (f.field_type === "multiselect") return <Field key={f.id} label={label} hint={f.hint}><div className="flex flex-wrap gap-2 text-sm">{(f.options_json as string[]).map((o) => <label key={o}><input type="checkbox" name={n} value={o} defaultChecked={Array.isArray(v) && v.includes(o)} /> {o}</label>)}</div></Field>;
         if (f.field_type === "file") return <Field key={f.id} label={label} hint="Ссылка на загруженный файл объекта"><input className="input" name={n} defaultValue={v ? String(v) : ""} placeholder="/uploads/..." /></Field>;
         return <Field key={f.id} label={label} hint={f.hint}><input className="input" name={n} id={`f_${f.key}`} type={f.field_type === "number" ? "number" : "text"} step="any" defaultValue={v == null ? "" : String(v)} required={f.required} /></Field>; })}

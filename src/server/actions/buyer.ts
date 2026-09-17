@@ -49,7 +49,7 @@ export async function addLabReportAction(fd: FormData) {
 
 export async function createRequestAction(fd: FormData) {
   const s = await requireSession(); const pid = str(fd, "project_id"); const cat = str(fd, "category_id");
-  const back = `/projects/${pid}/requests/new?category=${cat}${str(fd, "target_company_id") ? "&target=" + str(fd, "target_company_id") : ""}`;
+  const back = `/projects/${pid}/requests/new?category=${cat}${str(fd, "target_company_id") ? "&target=" + str(fd, "target_company_id") : ""}${str(fd, "delivery_for") ? "&delivery_for=" + str(fd, "delivery_for") : ""}`;
   await act(back, async () => {
     const tpl = await Rq.currentTemplate(cat);
     const values: Record<string, unknown> = {};
@@ -61,6 +61,7 @@ export async function createRequestAction(fd: FormData) {
     }
     const ai = str(fd, "ai_parse_id") ? await prisma.aiParse.findUnique({ where: { id: str(fd, "ai_parse_id") } }) : null;
     const r = await Rq.createRequest(s.user.id, { project_id: pid, category_id: cat, stage_id: str(fd, "stage_id") || null, values, mode: (str(fd, "mode") || "matched") as never, target_company_id: str(fd, "target_company_id") || null, ai_extracted: ai?.result_json ?? undefined });
+    if (str(fd, "delivery_for")) await Rq.linkDeliveryRequest(s.user.id, str(fd, "delivery_for"), r.request.id);
     const n = r.match?.leads.length ?? 0;
     const info = r.match ? (n ? `Она отправлена ${n} подходящим поставщикам — ждите предложений (обычно в течение дня).` : `Подходящих поставщиков рядом пока не нашлось — заявка передана диспетчеру, он назначит исполнителя.`) : "";
     return `/requests/${r.request.id}?ok=${encodeURIComponent(`Заявка опубликована. ${info}${r.warnings.length ? " Обратите внимание: " + r.warnings.join("; ") : ""}`)}`;

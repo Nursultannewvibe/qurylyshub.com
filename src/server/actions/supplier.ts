@@ -52,7 +52,13 @@ export async function companySettingsAction(fd: FormData) {
     let polygon: number[][] | null = null;
     const raw = str(fd, "service_area_polygon");
     if (raw) { try { polygon = JSON.parse(raw); } catch { throw new Error("Полигон: ожидается JSON вида [[lat,lng],...]"); } }
-    await prisma.company.update({ where: { id: c.id }, data: { description: str(fd, "description") || null, daily_lead_limit: num(fd, "daily_lead_limit") ?? 5, pitch_daily_limit: num(fd, "pitch_daily_limit") ?? 5, pitch_cooldown_days: num(fd, "pitch_cooldown_days") ?? 7, service_center_lat: num(fd, "service_center_lat"), service_center_lng: num(fd, "service_center_lng"), service_radius_km: num(fd, "service_radius_km"), service_area_polygon: polygon as never, categories_json: cats, bank_account: str(fd, "bank_account") || null, is_public: bool(fd, "is_public") } });
+    const routeLines = str(fd, "service_routes").split(/\n|,/).map((l) => l.trim().toLowerCase()).filter(Boolean);
+    const routes: string[][] = [];
+    if (routeLines.length) {
+      const codes = new Set((await prisma.region.findMany({ select: { code: true } })).map((r) => r.code));
+      for (const l of routeLines) { const [a, b] = l.split(/\s*[-–>→]+\s*/); if (!a || !b || !codes.has(a) || !codes.has(b)) throw new Error(`Маршрут «${l}»: укажите два кода региона через дефис, например almaty-kaskelen`); routes.push([a, b]); }
+    }
+    await prisma.company.update({ where: { id: c.id }, data: { service_route_json: routes as never, description: str(fd, "description") || null, daily_lead_limit: num(fd, "daily_lead_limit") ?? 5, pitch_daily_limit: num(fd, "pitch_daily_limit") ?? 5, pitch_cooldown_days: num(fd, "pitch_cooldown_days") ?? 7, service_center_lat: num(fd, "service_center_lat"), service_center_lng: num(fd, "service_center_lng"), service_radius_km: num(fd, "service_radius_km"), service_area_polygon: polygon as never, categories_json: cats, bank_account: str(fd, "bank_account") || null, is_public: bool(fd, "is_public") } });
     await logActivity({ actor_id: s.user.id, entity_type: "company", entity_id: c.id, action: "settings_updated" });
     return "Настройки компании сохранены";
   });

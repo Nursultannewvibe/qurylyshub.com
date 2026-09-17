@@ -32,6 +32,9 @@ export default async function DealPage({ params, searchParams }: { params: Promi
         {isBuyer && deal.status !== "completed" && <p className="muted">Отзыв — после подтверждения получения.</p>}</div></div>;
   }
   const dealReq = deal.request!;
+  const logisticsCat = await prisma.category.findUnique({ where: { code: "logistics" } });
+  const dealCat = await prisma.category.findUnique({ where: { id: dealReq.category_id } });
+  const deliveryLinks = await prisma.requestLink.findMany({ where: { primary_request_id: dealReq.id }, include: { linked: { include: { category: true, leads: true, offers: true } } } });
   const gates = Object.fromEntries(await Promise.all(deal.milestones.map(async (m) => [m.id, await checklistGate(m.id)] as const)));
   const myReview = deal.reviews.find((r) => r.author_id === s.user.id);
   const buyer = await prisma.user.findUniqueOrThrow({ where: { id: deal.buyer_id } });
@@ -39,6 +42,7 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   return <div><Flash sp={sp} />
     <div className="mb-4 flex flex-wrap items-start justify-between gap-2"><div><h1 className="h1">Сделка: {dealReq.category.name} <Badge s={deal.status} /></h1><p className="muted"><Link className="text-brand-600" href={`/requests/${dealReq.id}`}>заявка</Link> · объект «{dealReq.project.name}» · исполнитель <Link className="text-brand-600" href={`/catalog/${deal.seller.public_slug}`}>{deal.seller.name}</Link> · заказчик {buyer.name ?? buyer.phone}</p></div>
       <div className="text-right"><div className="text-2xl font-bold"><Money v={deal.amount} /></div><div className="muted">комиссия {deal.commission_percent.toString()}% = <Money v={deal.commission_amount} />{deal.penalty_amount.gt(0) ? <> · пеня <Money v={deal.penalty_amount} /></> : null}</div><div className="text-xs text-slate-400">Отмена: {L(deal.cancel_policy)}{deal.work_started_at ? " · работы начаты" : ""}</div></div></div>
+    {isBuyer && dealCat?.category_type === "material" && logisticsCat && <div className="card mb-3 flex flex-wrap items-center justify-between gap-2 bg-brand-50"><div><b>Нужна доставка?</b> <span className="muted">Создадим заявку на перевозку: загрузка — {deal.seller.name}, выгрузка — ваш объект. Перевозчики получат её как обычную заявку.</span>{deliveryLinks.length > 0 && <div className="mt-1 text-sm">Заявки на доставку: {deliveryLinks.map((l) => <Link key={l.id} href={`/requests/${l.linked_request_id}`} className="mr-2 text-brand-600">{l.linked.category.name} <Badge s={l.linked.status} /> ({l.linked.leads.length} перевозч., {l.linked.offers.filter((o) => o.status === "sent").length} КП)</Link>)}</div>}</div><Link href={`/projects/${dealReq.project_id}/requests/new?category=${logisticsCat.id}&delivery_for=${deal.id}`} className="btn-primary">Найти перевозчика</Link></div>}
     {activeDisputes.length > 0 && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-800">⚠ Активный спор — раскрытие эскроу по спорному этапу заблокировано на бэкенде до решения.</p>}
     <div className="grid gap-4 lg:grid-cols-3"><div className="space-y-4 lg:col-span-2">
       <div className="card"><h2 className="h2 mb-2">Что входит в сделку</h2><ul className="text-sm">{deal.items.map((i) => <li key={i.id}>{L(i.portion)} — <Money v={i.amount} /> <span className="muted">(из КП «{L(i.offer.offer_scope)}», версия {i.offer.version})</span></li>)}</ul>
