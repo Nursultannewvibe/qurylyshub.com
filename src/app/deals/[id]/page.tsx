@@ -8,16 +8,36 @@ import * as D from "@/server/actions/deals";
 import { L } from "@/lib/i18n";
 import { config } from "@/server/config";
 import { FileInput } from "@/components/file-input";
+import { payProductAction, receivedAction } from "@/server/actions/products";
 
 export default async function DealPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { id } = await params; const sp = await searchParams; const s = await requireSession();
   const { deal, isBuyer, isSeller, isAdmin, isSupervisor } = await getDeal(id, s.user.id);
+  if (deal.deal_type === "product_purchase") {
+    const myReview = deal.reviews.find((r) => r.author_id === s.user.id);
+    const steps = ["created", "paid", "received", "completed"]; const idx = Math.max(steps.indexOf(deal.status), 0);
+    return <div className="mx-auto max-w-3xl"><Flash sp={sp} />
+      <h1 className="h1">Покупка товара: {deal.product?.name ?? "—"} <Badge s={deal.status} /></h1><p className="muted">продавец <Link className="text-brand-600" href={`/catalog/${deal.seller.public_slug}`}>{deal.seller.name}</Link> · {deal.product_qty} {deal.product?.unit} × <Money v={deal.product?.price} /> = <b><Money v={deal.amount} /></b> · комиссия платформы {deal.commission_percent.toString()}% (<Money v={deal.commission_amount} />)</p>
+      <ol className="my-4 flex flex-wrap gap-2 text-sm">{["Заказ создан", "Оплачено", "Получено", "Завершено"].map((t, i) => <li key={t} className={`badge ${i <= idx ? "bg-brand-600 text-white" : "bg-slate-100"}`}>{i + 1}. {t}</li>)}</ol>
+      <div className="card space-y-3">
+        {isBuyer && deal.status === "created" && <form action={payProductAction}><input type="hidden" name="deal_id" value={id} /><button className="btn-primary">Оплатить <Money v={deal.amount} /> (демо-оплата)</button><span className="ml-2 text-xs text-slate-500">повторный клик не спишет дважды</span></form>}
+        {isSeller && deal.status === "created" && <p className="muted">Ждём оплату покупателя — после оплаты отгружайте товар.</p>}
+        {isSeller && deal.status === "paid" && <p className="rounded bg-green-50 p-2 text-sm text-green-800">Оплачено. Отгрузите товар; после подтверждения получения покупателем деньги зачислятся на баланс.</p>}
+        {isBuyer && deal.status === "paid" && <form action={receivedAction}><input type="hidden" name="deal_id" value={id} /><button className="btn-primary">Товар получен</button><span className="ml-2 text-xs text-slate-500">после этого продавец получит деньги</span></form>}
+        {deal.status === "completed" && <p className="text-sm">Покупка завершена{deal.completed_at ? <> <Dt d={deal.completed_at} /></> : null}.</p>}
+        <ul className="text-sm">{deal.payments.map((p) => <li key={p.id}><Badge s={p.status} /> <Money v={p.amount} /> · {p.provider} {p.provider_ref ?? ""}</li>)}</ul>
+      </div>
+      <div className="card mt-4"><h2 className="h2 mb-2">Отзыв</h2>{deal.reviews.map((r) => <p key={r.id} className="text-sm">{"★".repeat(r.rating)} {r.text} <span className="muted">verified={String(r.verified)}</span></p>)}
+        {isBuyer && !myReview && deal.status === "completed" && <form action={D.reviewAction} className="space-y-1"><input type="hidden" name="deal_id" value={id} /><Field label="Рейтинг"><select className="input" name="rating" defaultValue="5">{[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{"★".repeat(n)}</option>)}</select></Field><textarea className="input" name="text" placeholder="Как товар и доставка?" rows={2} /><button className="btn-primary">Оставить отзыв</button></form>}
+        {isBuyer && deal.status !== "completed" && <p className="muted">Отзыв — после подтверждения получения.</p>}</div></div>;
+  }
+  const dealReq = deal.request!;
   const gates = Object.fromEntries(await Promise.all(deal.milestones.map(async (m) => [m.id, await checklistGate(m.id)] as const)));
   const myReview = deal.reviews.find((r) => r.author_id === s.user.id);
   const buyer = await prisma.user.findUniqueOrThrow({ where: { id: deal.buyer_id } });
   const activeDisputes = deal.disputes.filter((d) => ["open", "in_review"].includes(d.status));
   return <div><Flash sp={sp} />
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-2"><div><h1 className="h1">Сделка: {deal.request.category.name} <Badge s={deal.status} /></h1><p className="muted"><Link className="text-brand-600" href={`/requests/${deal.request_id}`}>заявка</Link> · объект «{deal.request.project.name}» · исполнитель <Link className="text-brand-600" href={`/catalog/${deal.seller.public_slug}`}>{deal.seller.name}</Link> · заказчик {buyer.name ?? buyer.phone}</p></div>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-2"><div><h1 className="h1">Сделка: {dealReq.category.name} <Badge s={deal.status} /></h1><p className="muted"><Link className="text-brand-600" href={`/requests/${dealReq.id}`}>заявка</Link> · объект «{dealReq.project.name}» · исполнитель <Link className="text-brand-600" href={`/catalog/${deal.seller.public_slug}`}>{deal.seller.name}</Link> · заказчик {buyer.name ?? buyer.phone}</p></div>
       <div className="text-right"><div className="text-2xl font-bold"><Money v={deal.amount} /></div><div className="muted">комиссия {deal.commission_percent.toString()}% = <Money v={deal.commission_amount} />{deal.penalty_amount.gt(0) ? <> · пеня <Money v={deal.penalty_amount} /></> : null}</div><div className="text-xs text-slate-400">Отмена: {L(deal.cancel_policy)}{deal.work_started_at ? " · работы начаты" : ""}</div></div></div>
     {activeDisputes.length > 0 && <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-800">⚠ Активный спор — раскрытие эскроу по спорному этапу заблокировано на бэкенде до решения.</p>}
     <div className="grid gap-4 lg:grid-cols-3"><div className="space-y-4 lg:col-span-2">

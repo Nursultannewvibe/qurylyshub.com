@@ -61,7 +61,7 @@ export async function activeDisputeFor(milestoneId: string, tx: Tx | typeof pris
 /** Чек-лист приёмки (10): критичные пункты (photo_required) должны быть отмечены И иметь фото. */
 export async function checklistGate(milestoneId: string) {
   const m = await prisma.milestone.findUniqueOrThrow({ where: { id: milestoneId }, include: { deal: { include: { request: true } }, checklist_results: { include: { item: true } } } });
-  const items = await prisma.acceptanceChecklist.findMany({ where: { category_id: m.deal.request.category_id } });
+  const items = m.deal.request ? await prisma.acceptanceChecklist.findMany({ where: { category_id: m.deal.request.category_id } }) : [];
   const missing: string[] = [];
   for (const it of items) {
     const r = m.checklist_results.find((x) => x.checklist_item_id === it.id);

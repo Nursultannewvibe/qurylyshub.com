@@ -84,7 +84,7 @@ export async function createDeals(userId: string, requestId: string, selections:
 }
 
 export async function getDeal(dealId: string, userId: string) {
-  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { request: { include: { category: true, project: true } }, seller: { include: { members: true } }, items: { include: { offer: true } }, milestones: { orderBy: { order_index: "asc" }, include: { escrow_holds: true, checklist_results: { include: { item: true } }, disputes: true } }, escrow_holds: true, acts: true, disputes: true, warranty_claims: true, payments: true, reviews: true } });
+  const deal = await prisma.deal.findUnique({ where: { id: dealId }, include: { request: { include: { category: true, project: true } }, product: true, seller: { include: { members: true } }, items: { include: { offer: true } }, milestones: { orderBy: { order_index: "asc" }, include: { escrow_holds: true, checklist_results: { include: { item: true } }, disputes: true } }, escrow_holds: true, acts: true, disputes: true, warranty_claims: true, payments: true, reviews: true } });
   if (!deal) throw notFound("Сделка не найдена");
   const roles = await prisma.userRole.findMany({ where: { user_id: userId } });
   const isAdmin = roles.some((r) => r.role === "admin");

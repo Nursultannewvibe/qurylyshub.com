@@ -20,7 +20,7 @@ export async function createReview(userId: string, dealId: string, input: { rati
   const review = await prisma.review.create({ data: { deal_id: dealId, author_id: userId, author_role: input.author_role ?? (isSupervisor && !isBuyer ? "supervisor" : "buyer"), target_company_id: deal.seller_id, rating: input.rating, text: input.text ?? null, photo_urls_json: (input.photo_urls ?? []) as never, verified: withinWindow, weight, flagged_suspicious: recent >= 2 } });
   if (input.photo_urls?.length) {
     const c = await prisma.company.findUniqueOrThrow({ where: { id: deal.seller_id } });
-    await prisma.company.update({ where: { id: c.id }, data: { portfolio_json: [...((c.portfolio_json as unknown[]) ?? []), ...input.photo_urls.map((p) => ({ photo: p, title: deal.request.project.name, from_review: review.id }))] as never } });
+    await prisma.company.update({ where: { id: c.id }, data: { portfolio_json: [...((c.portfolio_json as unknown[]) ?? []), ...input.photo_urls.map((p) => ({ photo: p, title: deal.request?.project.name ?? "Покупка товара", from_review: review.id }))] as never } });
   }
   await logActivity({ actor_id: userId, entity_type: "review", entity_id: review.id, action: "created", meta: { verified: withinWindow, weight } });
   await notifyCompany(deal.seller_id, { type: "review.new", payload: { review_id: review.id, rating: input.rating } });

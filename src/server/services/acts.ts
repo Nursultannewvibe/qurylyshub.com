@@ -17,7 +17,9 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&
  * 10. Генерация акта. Платформа НЕ подписывает акт — только формирует документ; подписывают стороны (SignatureProvider-мок).
  */
 export async function generateAct(dealId: string, milestoneId: string | null, type: ActType, actorId: string, extra: { supervisor_id?: string; conclusion?: string } = {}) {
-  const deal = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { seller: true, request: { include: { project: { include: { owner: true } }, category: true } }, items: true } });
+  const deal0 = await prisma.deal.findUniqueOrThrow({ where: { id: dealId }, include: { seller: true, request: { include: { project: { include: { owner: true } }, category: true } }, items: true } });
+  if (!deal0.request) throw conflict("not_service_deal", "Акты формируются только по сделкам-услугам");
+  const deal = { ...deal0, request: deal0.request };
   const milestone = milestoneId ? await prisma.milestone.findUniqueOrThrow({ where: { id: milestoneId }, include: { checklist_results: { include: { item: true } } } }) : null;
   const buyerName = deal.request.project.owner.name ?? deal.request.project.owner.phone;
   const title = type === "acceptance" ? "АКТ ПРИЁМКИ ВЫПОЛНЕННЫХ РАБОТ / ПОСТАВКИ" : type === "reconciliation" ? "АКТ СВЕРКИ ВЗАИМОРАСЧЁТОВ" : "ЗАКЛЮЧЕНИЕ ТЕХНИЧЕСКОГО НАДЗОРА";

@@ -125,8 +125,14 @@ enum DealStatus {
   created
   awaiting_payment
   in_progress
+  paid      // product_purchase: оплачено
+  received  // product_purchase: покупатель подтвердил получение
   completed
   cancelled
+}
+enum DealType {
+  service_request  // заявка → КП → эскроу по этапам → акты
+  product_purchase // прямая покупка товара: created → paid → received → completed
 }
 enum CancelPolicy {
   full_refund_before_start
@@ -212,6 +218,7 @@ enum PaymentPurpose {
   lead
   milestone
   subscription
+  product
 }
 enum PaymentStatus {
   pending
@@ -442,6 +449,7 @@ model Company {
   deals_as_seller   Deal[]           @relation("seller")
   deals_as_buyer    Deal[]           @relation("buyer")
   board_posts       BoardPost[]
+  products          Product[]
 
   @@map("companies")
 }
@@ -559,6 +567,7 @@ model Category {
   price_refs      PriceReference[]
   batches         RequestBatch[]
   board_posts     BoardPost[]
+  products        Product[]
 
   @@map("categories")
 }
@@ -954,8 +963,11 @@ model OfferTemplate {
 
 model Deal {
   id                 String       @id @default(cuid())
-  request_id         String
-  offer_id           String       // основной оффер (при разделённом выборе — первый)
+  deal_type          DealType     @default(service_request)
+  request_id         String?      // null для product_purchase
+  offer_id           String?      // основной оффер (при разделённом выборе — первый); null для product_purchase
+  product_id         String?
+  product_qty        Int?
   buyer_id           String       // user id
   buyer_company_id   String?
   seller_id          String       // company id
@@ -973,8 +985,9 @@ model Deal {
   completed_at       DateTime?
   cancelled_at       DateTime?
   created_at         DateTime     @default(now())
-  request   Request  @relation(fields: [request_id], references: [id])
-  offer     Offer    @relation(fields: [offer_id], references: [id])
+  request   Request? @relation(fields: [request_id], references: [id])
+  offer     Offer?   @relation(fields: [offer_id], references: [id])
+  product   Product? @relation(fields: [product_id], references: [id])
   seller    Company  @relation("seller", fields: [seller_id], references: [id])
   buyer_company Company? @relation("buyer", fields: [buyer_company_id], references: [id])
   items      DealItem[]
@@ -1367,4 +1380,27 @@ model BoardReport {
 
   @@index([status])
   @@map("board_reports")
+}
+
+// ───────────────────────── КАТАЛОГ ТОВАРОВ (прямая покупка без цикла заявка→КП) ─────────────────────────
+model Product {
+  id            String   @id @default(cuid())
+  company_id    String
+  category_id   String
+  name          String
+  description   String?
+  unit          String   @default("шт")
+  price         Decimal  @db.Decimal(14, 2)
+  currency      String   @default("KZT")
+  stock_qty     Int?     // null = под заказ (остаток не ограничен)
+  min_order_qty Int      @default(1)
+  photos_json   Json     @default("[]")
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  company  Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id])
+  deals    Deal[]
+
+  @@index([company_id, is_active])
+  @@map("products")
 }

@@ -14,5 +14,6 @@ export async function companyCard(slug: string) {
   const c = await prisma.company.findUnique({ where: { public_slug: slug }, include: { reputation: true, verifications: true, external_profiles: true, reviews_received: { where: { verified: true }, include: { author: { select: { name: true } }, responses: true, disputes: true }, orderBy: { created_at: "desc" } } } });
   if (!c) return null;
   const cats = await prisma.category.findMany({ where: { id: { in: (c.categories_json as string[]) ?? [] } } });
-  return { ...c, categories: cats };
+  const products = await prisma.product.findMany({ where: { company_id: c.id, is_active: true }, include: { category: true }, orderBy: { created_at: "desc" } });
+  return { ...c, categories: cats, products };
 }

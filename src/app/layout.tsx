@@ -21,7 +21,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (session) {
     nav.push({ href: "/dashboard", label: t(locale, "dashboard") });
     if (isBuyer) nav.push({ href: "/projects", label: t(locale, "projects") }, { href: "/inbox", label: t(locale, "inbox") }, { href: "/outbox", label: t(locale, "outbox") });
-    if (isSupplier) nav.push({ href: "/supplier/leads", label: t(locale, "leads") }, { href: "/supplier/map", label: t(locale, "map") }, { href: "/supplier/wallet", label: t(locale, "wallet") });
+    if (isSupplier) nav.push({ href: "/supplier/leads", label: t(locale, "leads") }, { href: "/supplier/map", label: t(locale, "map") }, { href: "/supplier/wallet", label: t(locale, "wallet") }, { href: "/supplier/products", label: locale === "kk" ? "Тауарлар" : "Товары" });
     nav.push({ href: "/deals", label: t(locale, "deals") }, { href: "/threads", label: t(locale, "threads") });
     if (roles.includes("supervisor")) nav.push({ href: "/supervisor", label: t(locale, "supervisor") });
     if (roles.includes("admin")) nav.push({ href: "/admin", label: t(locale, "admin") });
