@@ -46,8 +46,8 @@ const cid = async (s: D.Session) => (await prisma.company.findFirstOrThrow({ whe
     return "без БИН; пожарка: лид/pitch/КП заблокированы (403 license_required); малярка — полный цикл";
   });
 
-  const extra = await import("./features-2").catch(() => null);
-  if (extra) await extra.run({ run, aidar, adm, house, flat, photo, cid });
+  if (!only || /^F/.test(only)) await (await import("./features-2")).run({ run, aidar, adm, house, flat, photo, cid });
+  if (!only || /^G/.test(only)) await (await import("./features-3")).run({ run, aidar, adm, house, flat, photo, cid });
 
   const bad = rows.filter((r) => r.finding);
   console.log(`\n══════ ${rows.length - bad.length}/${rows.length} без находок ══════`); for (const r of bad) console.log(`  ❌ ${r.id} → ${r.finding}`);
