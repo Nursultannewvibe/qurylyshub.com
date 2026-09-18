@@ -21,6 +21,7 @@ export default async function SupplierProducts({ searchParams }: { searchParams:
         <Field label="Описание"><textarea className="input" name="description" rows={2} /></Field>
         <div className="grid grid-cols-3 gap-1"><Field label="Ед."><input className="input" name="unit" defaultValue="шт" /></Field><Field label="Цена, ₸"><input className="input" name="price" type="number" required /></Field><Field label="Мин. заказ"><input className="input" name="min_order_qty" type="number" defaultValue={1} /></Field></div>
         <Field label="Остаток на складе" hint="Пусто = под заказ, без ограничения по количеству"><input className="input" name="stock_qty" type="number" /></Field>
+        <Field label="Срок поставки, дн." hint="Показывается в карточке и в сравнении"><input className="input" name="delivery_days" type="number" /></Field>
         <Field label="Фото товара"><MultiPhotoInput maxCount={config.productPhotosMax} maxMb={config.uploadEffectiveMaxMb} /></Field>
         <button className="btn-primary">Добавить</button></form></div></div>;
 }

@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const unread = session ? await prisma.notification.count({ where: { user_id: session.user.id, channel: "in_app", read: false } }) : 0;
+  const compareN = session ? await prisma.comparisonItem.count({ where: { user_id: session.user.id } }) : 0;
   const roles = session?.user.roles ?? [];
   const isSupplier = roles.includes("supplier") || roles.includes("contractor");
   const isBuyer = roles.includes("buyer");
@@ -36,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="ml-auto flex items-center gap-3 text-sm">
               <form action="/api/locale" method="post"><input type="hidden" name="locale" value={locale === "ru" ? "kk" : "ru"} /><button className="text-slate-500 hover:text-brand-700">{t(locale, "lang")}</button></form>
               {session ? (<>
+                <Link href="/compare" className="text-slate-600" title="Список сравнения">⚖{compareN ? ` ${compareN}` : ""}</Link>
                 <Link href="/notifications" className="relative text-slate-600">🔔{unread ? <span className="absolute -right-2 -top-2 rounded-full bg-red-600 px-1.5 text-[10px] text-white">{unread}</span> : null}</Link>
                 <Link href="/settings" className="text-slate-700">{session.user.name ?? session.user.phone}</Link>
                 <form action="/api/auth/logout" method="post"><button className="text-slate-500 hover:text-red-600">{t(locale, "logout")}</button></form>

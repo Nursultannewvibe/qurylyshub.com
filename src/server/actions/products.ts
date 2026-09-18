@@ -16,7 +16,7 @@ async function uploadPhotos(fd: FormData, ownerId: string, existing = 0) {
 
 export async function createProductAction(fd: FormData) {
   const s = await requireSession(); const c = companyOf(s);
-  await act("/supplier/products", async () => { const photos = await uploadPhotos(fd, s.user.id); await P.createProduct(s.user.id, c.id, { category_id: str(fd, "category_id"), name: str(fd, "name"), description: str(fd, "description") || null, unit: str(fd, "unit"), price: num(fd, "price") ?? 0, stock_qty: str(fd, "stock_qty") === "" ? null : num(fd, "stock_qty"), min_order_qty: num(fd, "min_order_qty") ?? 1, photos }); return `Товар добавлен в каталог${photos.length ? ` (${photos.length} фото)` : ""}`; });
+  await act("/supplier/products", async () => { const photos = await uploadPhotos(fd, s.user.id); await P.createProduct(s.user.id, c.id, { category_id: str(fd, "category_id"), name: str(fd, "name"), description: str(fd, "description") || null, unit: str(fd, "unit"), price: num(fd, "price") ?? 0, stock_qty: str(fd, "stock_qty") === "" ? null : num(fd, "stock_qty"), min_order_qty: num(fd, "min_order_qty") ?? 1, photos, delivery_days: num(fd, "delivery_days") }); return `Товар добавлен в каталог${photos.length ? ` (${photos.length} фото)` : ""}`; });
 }
 export async function updateProductAction(fd: FormData) {
   const s = await requireSession();

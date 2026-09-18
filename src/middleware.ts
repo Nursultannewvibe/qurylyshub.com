@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-const PROTECTED = ["/dashboard", "/projects", "/inbox", "/outbox", "/deals", "/threads", "/supplier", "/admin", "/supervisor", "/settings", "/notifications", "/requests", "/broadcast"];
+const PROTECTED = ["/dashboard", "/projects", "/inbox", "/outbox", "/deals", "/threads", "/supplier", "/admin", "/supervisor", "/settings", "/notifications", "/requests", "/broadcast", "/compare"];
 export function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname;
   if (PROTECTED.some((x) => p === x || p.startsWith(x + "/")) && !req.cookies.get("qh_session")) {

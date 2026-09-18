@@ -326,6 +326,7 @@ model User {
   ai_parses             AiParse[]
   board_posts           BoardPost[]
   board_replies         BoardReply[]
+  comparison_items      ComparisonItem[]
 
   @@map("users")
 }
@@ -1407,11 +1408,13 @@ model Product {
   stock_qty     Int?     // null = под заказ (остаток не ограничен)
   min_order_qty Int      @default(1)
   photos_json   Json     @default("[]")
+  delivery_days Int?     // срок поставки, дн.
   is_active     Boolean  @default(true)
   created_at    DateTime @default(now())
   company  Company  @relation(fields: [company_id], references: [id], onDelete: Cascade)
   category Category @relation(fields: [category_id], references: [id])
   deals    Deal[]
+  comparisons ComparisonItem[]
 
   @@index([company_id, is_active])
   @@map("products")
@@ -1429,4 +1432,17 @@ model RequestLink {
 
   @@unique([primary_request_id, linked_request_id])
   @@map("request_links")
+}
+
+// Список сравнения товаров — у любого вошедшего пользователя (привязан к user_id, не к роли)
+model ComparisonItem {
+  id         String   @id @default(cuid())
+  user_id    String
+  product_id String
+  added_at   DateTime @default(now())
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, product_id])
+  @@map("comparison_items")
 }

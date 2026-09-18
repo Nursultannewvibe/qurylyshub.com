@@ -20,6 +20,7 @@ export const config = {
   pitchExpiresDays: int("PITCH_EXPIRES_DAYS", 7),
   boardPostDailyLimit: int("BOARD_POST_DAILY_LIMIT", 5),
   productPhotosMax: int("PRODUCT_PHOTOS_MAX", 6),
+  compareMax: int("COMPARE_MAX_ITEMS", 5),
   aiParseDailyLimit: int("AI_PARSE_DAILY_LIMIT", 10),
   uploadDir: str("UPLOAD_DIR", "./uploads"),
   uploadMaxMb: int("UPLOAD_MAX_MB", 15),
