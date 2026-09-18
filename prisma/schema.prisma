@@ -1012,6 +1012,7 @@ model Deal {
   payments   Payment[]
   reviews    Review[]
   ratings    Rating[]
+  delivery_links RequestLink[] @relation("delivery_links")
 
   @@index([seller_id])
   @@index([buyer_id])
@@ -1423,14 +1424,17 @@ model Product {
 // Связанные заявки (как deal_items связывает части одной покупки): материал → его доставка
 model RequestLink {
   id                 String          @id @default(cuid())
-  primary_request_id String
+  primary_request_id String?         // исходная заявка (сделка-услуга)
+  primary_deal_id    String?         // или исходная сделка-покупка товара (у неё нет заявки)
   linked_request_id  String
   link_type          RequestLinkType @default(delivery)
   created_at         DateTime        @default(now())
-  primary Request @relation("primary", fields: [primary_request_id], references: [id], onDelete: Cascade)
-  linked  Request @relation("linked", fields: [linked_request_id], references: [id], onDelete: Cascade)
+  primary      Request? @relation("primary", fields: [primary_request_id], references: [id], onDelete: Cascade)
+  primary_deal Deal?    @relation("delivery_links", fields: [primary_deal_id], references: [id], onDelete: Cascade)
+  linked       Request  @relation("linked", fields: [linked_request_id], references: [id], onDelete: Cascade)
 
   @@unique([primary_request_id, linked_request_id])
+  @@index([primary_deal_id])
   @@map("request_links")
 }
 

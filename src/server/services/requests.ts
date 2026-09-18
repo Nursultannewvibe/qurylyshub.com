@@ -163,9 +163,12 @@ export async function createTemplateVersion(categoryId: string, params: { key: s
 /** СВЯЗКА «материал → доставка»: заявка на перевозку привязывается к исходной заявке сделки (request_links, тот же принцип, что deal_items). */
 export async function linkDeliveryRequest(userId: string, dealId: string, deliveryRequestId: string) {
   const deal = await prisma.deal.findUnique({ where: { id: dealId } });
-  if (!deal?.request_id) throw notFound("Сделка не найдена");
-  await assertProjectAccess((await prisma.request.findUniqueOrThrow({ where: { id: deal.request_id } })).project_id, userId);
-  const link = await prisma.requestLink.upsert({ where: { primary_request_id_linked_request_id: { primary_request_id: deal.request_id, linked_request_id: deliveryRequestId } }, create: { primary_request_id: deal.request_id, linked_request_id: deliveryRequestId, link_type: "delivery" }, update: {} });
+  if (!deal) throw notFound("Сделка не найдена");
+  if (deal.buyer_id !== userId) throw forbidden("Доставку запрашивает покупатель по сделке");
+  // сделка-услуга → связь с её заявкой; покупка товара (заявки нет) → связь со сделкой
+  const link = deal.request_id
+    ? await prisma.requestLink.upsert({ where: { primary_request_id_linked_request_id: { primary_request_id: deal.request_id, linked_request_id: deliveryRequestId } }, create: { primary_request_id: deal.request_id, primary_deal_id: dealId, linked_request_id: deliveryRequestId, link_type: "delivery" }, update: {} })
+    : await prisma.requestLink.create({ data: { primary_deal_id: dealId, linked_request_id: deliveryRequestId, link_type: "delivery" } });
   await logActivity({ actor_id: userId, entity_type: "request_link", entity_id: link.id, action: "created", meta: { deal_id: dealId } });
   return link;
 }

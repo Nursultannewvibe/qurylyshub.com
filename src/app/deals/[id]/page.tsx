@@ -15,9 +15,16 @@ export default async function DealPage({ params, searchParams }: { params: Promi
   const { deal, isBuyer, isSeller, isAdmin, isSupervisor } = await getDeal(id, s.user.id);
   if (deal.deal_type === "product_purchase") {
     const myReview = deal.reviews.find((r) => r.author_id === s.user.id);
+    const productCat = deal.product ? await prisma.category.findUnique({ where: { id: deal.product.category_id } }) : null;
+    const logisticsCatP = await prisma.category.findUnique({ where: { code: "logistics" } });
+    const myProjects = isBuyer ? await prisma.project.findMany({ where: { owner_id: s.user.id, status: "active" }, orderBy: { created_at: "desc" }, take: 10 }) : [];
+    const pLinks = await prisma.requestLink.findMany({ where: { primary_deal_id: id }, include: { linked: { include: { category: true, leads: true, offers: true } } } });
     const steps = ["created", "paid", "received", "completed"]; const idx = Math.max(steps.indexOf(deal.status), 0);
     return <div className="mx-auto max-w-3xl"><Flash sp={sp} />
       <h1 className="h1">Покупка товара: {deal.product?.name ?? "—"} <Badge s={deal.status} /></h1><p className="muted">продавец <Link className="text-brand-600" href={`/catalog/${deal.seller.public_slug}`}>{deal.seller.name}</Link> · {deal.product_qty} {deal.product?.unit} × <Money v={deal.product?.price} /> = <b><Money v={deal.amount} /></b> · комиссия платформы {deal.commission_percent.toString()}% (<Money v={deal.commission_amount} />)</p>
+      {isBuyer && productCat?.category_type === "material" && logisticsCatP && <div className="card my-3 bg-brand-50"><b>Нужна доставка?</b> <span className="muted">Создадим заявку на перевозку: загрузка — {deal.seller.name}, выгрузка — ваш объект. Перевозчики получат её как обычную заявку.</span>
+        <div className="mt-1 flex flex-wrap gap-2 text-sm">{myProjects.map((pr) => <Link key={pr.id} href={`/projects/${pr.id}/requests/new?category=${logisticsCatP.id}&delivery_for=${deal.id}`} className="btn-primary text-xs">→ на объект «{pr.name}»</Link>)}{!myProjects.length && <Link href="/projects/new" className="btn-secondary text-xs">Сначала создайте объект (адрес выгрузки)</Link>}</div>
+        {pLinks.length > 0 && <div className="mt-1 text-sm">Заявки на доставку: {pLinks.map((l) => <Link key={l.id} href={`/requests/${l.linked_request_id}`} className="mr-2 text-brand-600">{l.linked.category.name} <Badge s={l.linked.status} /> ({l.linked.leads.length} перевозч., {l.linked.offers.filter((o) => o.status === "sent").length} КП)</Link>)}</div>}</div>}
       <ol className="my-4 flex flex-wrap gap-2 text-sm">{["Заказ создан", "Оплачено", "Получено", "Завершено"].map((t, i) => <li key={t} className={`badge ${i <= idx ? "bg-brand-600 text-white" : "bg-slate-100"}`}>{i + 1}. {t}</li>)}</ol>
       <div className="card space-y-3">
         {isBuyer && deal.status === "created" && <form action={payProductAction}><input type="hidden" name="deal_id" value={id} /><button className="btn-primary">Оплатить <Money v={deal.amount} /> (демо-оплата)</button><span className="ml-2 text-xs text-slate-500">повторный клик не спишет дважды</span></form>}
