@@ -6,6 +6,15 @@ import { resolveCommission, getDeal } from "./deals";
 import { createPayment } from "./payments";
 import { notify, notifyCompany } from "./notifications";
 import { config } from "../config";
+import { hasValidLicense } from "./matching";
+import { AppError } from "../errors";
+
+/** Та же проверка, что для КП/лидов/pitch: в категории с required_license продавать может только компания с verified лицензией (физлицо — никогда). */
+async function assertCanSellIn(companyId: string, categoryId: string) {
+  const [category, company] = await Promise.all([prisma.category.findUniqueOrThrow({ where: { id: categoryId } }), prisma.company.findUniqueOrThrow({ where: { id: companyId } })]);
+  if (company.soft_banned_until && company.soft_banned_until > new Date()) throw forbidden("Компания под soft-ban до ручного разбора — продажи приостановлены");
+  if (category.required_license && !(await hasValidLicense(companyId, categoryId))) throw new AppError("license_required", company.legal_type === "individual_contractor" ? `Категория «${category.name}» требует лицензию — физлицо-исполнитель не может продавать в лицензируемых категориях` : `Категория «${category.name}» требует верифицированную лицензию — загрузите её в настройках, товар можно выставить после подтверждения`, 403);
+}
 
 /** Лимит числа фото у товара (размер файла проверяет saveUpload по общим константам загрузки). */
 export function assertPhotoCount(n: number) {
@@ -23,6 +32,7 @@ export async function createProduct(userId: string, companyId: string, input: Pr
   await assertMember(userId, companyId);
   if (!input.name.trim()) throw bad("name", "Укажите название");
   if (!(input.price > 0)) throw bad("price", "Цена должна быть больше 0");
+  await assertCanSellIn(companyId, input.category_id);
   assertPhotoCount(input.photos?.length ?? 0);
   const p = await prisma.product.create({ data: { company_id: companyId, category_id: input.category_id, name: input.name.trim(), description: input.description ?? null, unit: input.unit || "шт", price: new Prisma.Decimal(input.price), stock_qty: input.stock_qty ?? null, min_order_qty: Math.max(1, input.min_order_qty ?? 1), photos_json: (input.photos ?? []) as never, is_active: input.is_active ?? true, delivery_days: input.delivery_days ?? null } });
   await logActivity({ actor_id: userId, entity_type: "product", entity_id: p.id, action: "created" });
@@ -33,6 +43,7 @@ export async function updateProduct(userId: string, productId: string, patch: Pa
   const p = await prisma.product.findUnique({ where: { id: productId } });
   if (!p) throw notFound("Товар не найден");
   await assertMember(userId, p.company_id);
+  if (patch.is_active) await assertCanSellIn(p.company_id, p.category_id); // включить продажу можно только при действующей лицензии
   if (patch.photos) assertPhotoCount(patch.photos.length);
   const upd = await prisma.product.update({ where: { id: productId }, data: { ...(patch.photos ? { photos_json: patch.photos as never } : {}), ...(patch.name != null ? { name: patch.name } : {}), ...(patch.price != null ? { price: new Prisma.Decimal(patch.price) } : {}), ...("stock_qty" in patch ? { stock_qty: patch.stock_qty ?? null } : {}), ...(patch.is_active != null ? { is_active: patch.is_active } : {}), ...(patch.description !== undefined ? { description: patch.description } : {}), ...(patch.min_order_qty != null ? { min_order_qty: patch.min_order_qty } : {}) } });
   await logActivity({ actor_id: userId, entity_type: "product", entity_id: productId, action: "updated", meta: patch });
@@ -51,6 +62,7 @@ export async function purchaseProduct(userId: string, productId: string, qty: nu
     const [p] = await tx.$queryRaw<{ id: string; company_id: string; name: string; price: Prisma.Decimal; stock_qty: number | null; min_order_qty: number; is_active: boolean }[]>`SELECT id, company_id, name, price, stock_qty, min_order_qty, is_active FROM products WHERE id = ${productId} FOR UPDATE`;
     if (!p) throw notFound("Товар не найден");
     if (!p.is_active) throw conflict("inactive", "Товар снят с продажи");
+    await assertCanSellIn(p.company_id, (await tx.product.findUniqueOrThrow({ where: { id: p.id }, select: { category_id: true } })).category_id); // лицензия могла истечь / продавец под баном после публикации
     if (memberships.some((m) => m.company_id === p.company_id)) throw forbidden("Нельзя купить товар у собственной компании");
     if (qty < p.min_order_qty) throw bad("min_order", `Минимальный заказ — ${p.min_order_qty}`);
     if (p.stock_qty != null && p.stock_qty < qty) throw conflict("out_of_stock", p.stock_qty === 0 ? "Товар закончился" : `На складе только ${p.stock_qty}`);
