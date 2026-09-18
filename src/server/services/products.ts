@@ -5,6 +5,12 @@ import { logActivity } from "../activity";
 import { resolveCommission, getDeal } from "./deals";
 import { createPayment } from "./payments";
 import { notify, notifyCompany } from "./notifications";
+import { config } from "../config";
+
+/** Лимит числа фото у товара (размер файла проверяет saveUpload по общим константам загрузки). */
+export function assertPhotoCount(n: number) {
+  if (n > config.productPhotosMax) throw bad("photos_limit", `У товара может быть не больше ${config.productPhotosMax} фото (выбрано ${n})`);
+}
 
 export type ProductInput = { category_id: string; name: string; description?: string | null; unit?: string; price: number; stock_qty?: number | null; min_order_qty?: number; photos?: string[]; is_active?: boolean };
 
@@ -17,6 +23,7 @@ export async function createProduct(userId: string, companyId: string, input: Pr
   await assertMember(userId, companyId);
   if (!input.name.trim()) throw bad("name", "Укажите название");
   if (!(input.price > 0)) throw bad("price", "Цена должна быть больше 0");
+  assertPhotoCount(input.photos?.length ?? 0);
   const p = await prisma.product.create({ data: { company_id: companyId, category_id: input.category_id, name: input.name.trim(), description: input.description ?? null, unit: input.unit || "шт", price: new Prisma.Decimal(input.price), stock_qty: input.stock_qty ?? null, min_order_qty: Math.max(1, input.min_order_qty ?? 1), photos_json: (input.photos ?? []) as never, is_active: input.is_active ?? true } });
   await logActivity({ actor_id: userId, entity_type: "product", entity_id: p.id, action: "created" });
   return p;
@@ -26,7 +33,8 @@ export async function updateProduct(userId: string, productId: string, patch: Pa
   const p = await prisma.product.findUnique({ where: { id: productId } });
   if (!p) throw notFound("Товар не найден");
   await assertMember(userId, p.company_id);
-  const upd = await prisma.product.update({ where: { id: productId }, data: { ...(patch.name != null ? { name: patch.name } : {}), ...(patch.price != null ? { price: new Prisma.Decimal(patch.price) } : {}), ...("stock_qty" in patch ? { stock_qty: patch.stock_qty ?? null } : {}), ...(patch.is_active != null ? { is_active: patch.is_active } : {}), ...(patch.description !== undefined ? { description: patch.description } : {}), ...(patch.min_order_qty != null ? { min_order_qty: patch.min_order_qty } : {}) } });
+  if (patch.photos) assertPhotoCount(patch.photos.length);
+  const upd = await prisma.product.update({ where: { id: productId }, data: { ...(patch.photos ? { photos_json: patch.photos as never } : {}), ...(patch.name != null ? { name: patch.name } : {}), ...(patch.price != null ? { price: new Prisma.Decimal(patch.price) } : {}), ...("stock_qty" in patch ? { stock_qty: patch.stock_qty ?? null } : {}), ...(patch.is_active != null ? { is_active: patch.is_active } : {}), ...(patch.description !== undefined ? { description: patch.description } : {}), ...(patch.min_order_qty != null ? { min_order_qty: patch.min_order_qty } : {}) } });
   await logActivity({ actor_id: userId, entity_type: "product", entity_id: productId, action: "updated", meta: patch });
   return upd;
 }
